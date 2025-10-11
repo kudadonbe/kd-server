@@ -8,6 +8,85 @@ info:
 servers:
   - url: http://localhost:8080/v1
     description: Local development
-paths: {}
+paths:
+  /healthz:
+    get:
+      summary: Health check
+      description: Returns OK when the API is running.
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /version:
+    get:
+      summary: API version
+      description: Returns the running API version string.
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      responses:
+        '200':
+          description: Version information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionResponse'
+        '400':
+          description: Missing tenant header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Tenant mismatch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
-  schemas: {}
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Bearer token signed with the server's HS256 secret. Tokens must include a `tenant` claim.
+    tenantHeader:
+      type: apiKey
+      in: header
+      name: X-KD-Tenant
+      description: Tenant slug that must match the token contents.
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+      required:
+        - ok
+    VersionResponse:
+      type: object
+      properties:
+        version:
+          type: string
+          example: 1.0.0
+      required:
+        - version
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: invalid token
+      required:
+        - error

@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/kudadonbe/kd-server/internal/auth"
 	apphttp "github.com/kudadonbe/kd-server/internal/http"
 	"github.com/kudadonbe/kd-server/internal/services"
 	"github.com/kudadonbe/kd-server/internal/store"
@@ -41,6 +42,16 @@ func main() {
 		mongoDatabase = defaultMongoDatabase
 	}
 
+	jwtSecret := os.Getenv("JWT_SIGNING_KEY")
+	if jwtSecret == "" {
+		logger.Fatal("environment variable JWT_SIGNING_KEY is required")
+	}
+
+	authVerifier, err := auth.NewHMACVerifier(jwtSecret)
+	if err != nil {
+		logger.Fatalf("failed to configure auth verifier: %v", err)
+	}
+
 	rootCtx := context.Background()
 	mongoStore, err := store.Connect(rootCtx, store.Config{
 		URI:      mongoURI,
@@ -60,16 +71,17 @@ func main() {
 	}()
 
 	indexCtx, cancelIndexes := context.WithTimeout(rootCtx, shutdownTimeout)
+	defer cancelIndexes()
+
 	if err := mongoStore.EnsureIndexes(indexCtx); err != nil {
-		cancelIndexes()
 		logger.Fatalf("mongo ensure indexes failed: %v", err)
 	}
-	cancelIndexes()
 
 	versionService := services.NewStaticVersionService(appVersion)
 	handler := apphttp.NewHandler(apphttp.Config{
 		Logger:         logger,
 		VersionService: versionService,
+		AuthVerifier:   authVerifier,
 	})
 
 	server := &http.Server{

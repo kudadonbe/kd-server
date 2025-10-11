@@ -2,7 +2,10 @@ module github.com/kudadonbe/kd-server
 
 go 1.22
 
-require go.mongodb.org/mongo-driver v1.17.4
+require (
+	github.com/golang-jwt/jwt/v5 v5.3.0
+	go.mongodb.org/mongo-driver v1.17.4
+)
 
 require (
 	github.com/golang/snappy v0.0.4 // indirect
