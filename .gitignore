@@ -1,0 +1,28 @@
+# Binaries
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go build cache and test binaries
+*.test
+*.out
+
+# Coverage reports
+coverage.*
+*.coverprofile
+
+# IDE/editor
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Environment & local config
+.env
+.env.*
+
+# Logs
+*.log

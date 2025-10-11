@@ -1,0 +1,13 @@
+openapi: 3.1.0
+info:
+  title: KD-Server API
+  version: 0.1.0
+  description: |
+    Placeholder spec. Define endpoints for ingest, resolve, lookup, and admin flows
+    as roadmap parts are completed.
+servers:
+  - url: http://localhost:8080/v1
+    description: Local development
+paths: {}
+components:
+  schemas: {}
