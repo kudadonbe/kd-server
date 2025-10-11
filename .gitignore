@@ -27,3 +27,4 @@ coverage.*
 
 # Logs
 *.log
+.gocache/
