@@ -23,6 +23,7 @@ coverage.*
 # Environment & local config
 .env
 .env.*
+/tmp/*
 
 # Logs
 *.log
