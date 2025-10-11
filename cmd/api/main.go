@@ -12,12 +12,15 @@ import (
 
 	apphttp "github.com/kudadonbe/kd-server/internal/http"
 	"github.com/kudadonbe/kd-server/internal/services"
+	"github.com/kudadonbe/kd-server/internal/store"
 )
 
 const (
-	defaultAddr     = ":8080"
-	appVersion      = "1.0.0"
-	shutdownTimeout = 5 * time.Second
+	defaultAddr          = ":8080"
+	appVersion           = "1.0.0"
+	shutdownTimeout      = 5 * time.Second
+	defaultMongoURI      = "mongodb://localhost:27017"
+	defaultMongoDatabase = "kdserver"
 )
 
 func main() {
@@ -27,6 +30,41 @@ func main() {
 	if port := os.Getenv("PORT"); port != "" {
 		addr = ":" + port
 	}
+
+	mongoURI := os.Getenv("MONGO_URI")
+	if mongoURI == "" {
+		mongoURI = defaultMongoURI
+	}
+
+	mongoDatabase := os.Getenv("MONGO_DB")
+	if mongoDatabase == "" {
+		mongoDatabase = defaultMongoDatabase
+	}
+
+	rootCtx := context.Background()
+	mongoStore, err := store.Connect(rootCtx, store.Config{
+		URI:      mongoURI,
+		Database: mongoDatabase,
+		Logger:   logger,
+		Timeout:  shutdownTimeout,
+	})
+	if err != nil {
+		logger.Fatalf("mongo connect failed: %v", err)
+	}
+	defer func() {
+		closeCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+		if err := mongoStore.Close(closeCtx); err != nil {
+			logger.Printf("mongo disconnect error: %v", err)
+		}
+	}()
+
+	indexCtx, cancelIndexes := context.WithTimeout(rootCtx, shutdownTimeout)
+	if err := mongoStore.EnsureIndexes(indexCtx); err != nil {
+		cancelIndexes()
+		logger.Fatalf("mongo ensure indexes failed: %v", err)
+	}
+	cancelIndexes()
 
 	versionService := services.NewStaticVersionService(appVersion)
 	handler := apphttp.NewHandler(apphttp.Config{
