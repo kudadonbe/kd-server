@@ -1,0 +1,10 @@
+{
+  "source": {
+    "slug": "system",
+    "name": "System Import"
+  },
+  "records": [
+    { "id": "1", "name": "Jane Example" },
+    { "id": "2", "name": "John Example" }
+  ]
+}

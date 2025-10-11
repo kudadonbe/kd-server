@@ -52,6 +52,234 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /ingest:
+    post:
+      summary: Ingest raw records
+      description: Stores raw records for later processing.
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IngestRequest'
+      responses:
+        '200':
+          description: Ingest accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestResponse'
+        '400':
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Tenant mismatch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /resolve:
+    post:
+      summary: Resolve raw records
+      description: Applies deterministic matching rules to pending ingest records.
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResolveRequest'
+      responses:
+        '200':
+          description: Resolve job completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResolveResponse'
+        '400':
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Tenant mismatch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /lookup/phone/{e164}:
+    get:
+      summary: Lookup person by phone
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: e164
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Phone number in E.164 format.
+      responses:
+        '200':
+          description: Person found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PersonView'
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Tenant mismatch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Person not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /lookup/email/{email}:
+    get:
+      summary: Lookup person by email
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: email
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Person found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PersonView'
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Tenant mismatch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Person not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /review:
+    get:
+      summary: List review items
+      description: Returns raw ingest records that require manual review.
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            example: needs_review
+      responses:
+        '200':
+          description: Review items
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewListResponse'
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Tenant mismatch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /review/{id}/decision:
+    post:
+      summary: Submit review decision
+      description: Updates review item state (stub implementation).
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewDecisionRequest'
+      responses:
+        '200':
+          description: Decision applied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewDecisionResponse'
+        '400':
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Tenant mismatch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   securitySchemes:
     bearerAuth:
@@ -90,3 +318,172 @@ components:
           example: invalid token
       required:
         - error
+    IngestRequest:
+      type: object
+      properties:
+        source:
+          $ref: '#/components/schemas/IngestSource'
+        records:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+      required:
+        - source
+        - records
+    IngestSource:
+      type: object
+      properties:
+        slug:
+          type: string
+          example: system
+        name:
+          type: string
+          example: System Import
+      required:
+        - slug
+    IngestResponse:
+      type: object
+      properties:
+        created:
+          type: integer
+          example: 10
+        linked:
+          type: integer
+          example: 4
+        needs_review:
+          type: integer
+          example: 1
+      required:
+        - created
+        - linked
+        - needs_review
+    ResolveRequest:
+      type: object
+      properties:
+        batch_size:
+          type: integer
+          example: 100
+    ResolveResponse:
+      type: object
+      properties:
+        resolved:
+          type: integer
+          example: 5
+        needs_review:
+          type: integer
+          example: 1
+        skipped:
+          type: integer
+          example: 0
+      required:
+        - resolved
+        - needs_review
+        - skipped
+    PersonView:
+      type: object
+      properties:
+        person:
+          $ref: '#/components/schemas/Person'
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Link'
+      required:
+        - person
+        - links
+    Person:
+      type: object
+      properties:
+        personId:
+          type: string
+          example: p_123
+        tenantId:
+          type: string
+        nationalId:
+          type: string
+          nullable: true
+        primaryEmail:
+          type: string
+          nullable: true
+        primaryPhone:
+          type: string
+          nullable: true
+        attributes:
+          type: object
+          additionalProperties: {}
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - personId
+        - tenantId
+        - createdAt
+        - updatedAt
+    Link:
+      type: object
+      properties:
+        source:
+          type: string
+          example: system
+        externalId:
+          type: string
+        payload:
+          type: object
+          additionalProperties: {}
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - source
+        - externalId
+        - createdAt
+        - updatedAt
+    ReviewListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReviewItem'
+      required:
+        - items
+    ReviewItem:
+      type: object
+      properties:
+        id:
+          type: string
+        source_slug:
+          type: string
+        payload:
+          type: object
+          additionalProperties: {}
+        status:
+          type: string
+      required:
+        - id
+        - source_slug
+        - payload
+        - status
+    ReviewDecisionRequest:
+      type: object
+      properties:
+        decision:
+          type: string
+          enum: [accept, reject]
+      required:
+        - decision
+    ReviewDecisionResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: updated
+      required:
+        - status

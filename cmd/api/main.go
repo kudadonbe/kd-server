@@ -78,10 +78,18 @@ func main() {
 	}
 
 	versionService := services.NewStaticVersionService(appVersion)
+	ingestService := services.NewIngestService(mongoStore.IngestWriter())
+	resolveService := services.NewResolveService(mongoStore)
+	lookupService := services.NewLookupService(mongoStore)
+	reviewService := services.NewReviewService(mongoStore)
 	handler := apphttp.NewHandler(apphttp.Config{
 		Logger:         logger,
 		VersionService: versionService,
 		AuthVerifier:   authVerifier,
+		IngestService:  ingestService,
+		ResolveService: resolveService,
+		LookupService:  lookupService,
+		ReviewService:  reviewService,
 	})
 
 	server := &http.Server{

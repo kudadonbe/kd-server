@@ -1,0 +1,44 @@
+### Ingest sample batch
+POST http://localhost:8080/v1/ingest
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjAxOTIzNjEsImlhdCI6MTc2MDE4ODc2MSwidGVuYW50IjoidGVuYW50LWEifQ.bWa5u7kDmYGZK--S0-E21PnmjhNv-rrWWxMKv_XyUTc
+X-KD-Tenant: tenant-a
+Content-Type: application/json
+
+{
+  "source": { "slug": "system", "name": "System Import" },
+  "records": [
+    { "id": "1", "name": "Jane Example", "email": "jane@example.com", "phone": "+15551234567" },
+    { "id": "2", "name": "John Example", "email": "john@example.com", "phone": "+15550987654" }
+  ]
+}
+
+### Resolve pending records
+POST http://localhost:8080/v1/resolve
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjAxOTIzNjEsImlhdCI6MTc2MDE4ODc2MSwidGVuYW50IjoidGVuYW50LWEifQ.bWa5u7kDmYGZK--S0-E21PnmjhNv-rrWWxMKv_XyUTc
+X-KD-Tenant: tenant-a
+Content-Type: application/json
+
+{ "batch_size": 50 }
+
+### Lookup person by phone
+GET http://localhost:8080/v1/lookup/phone/+15551234567
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjAxOTIzNjEsImlhdCI6MTc2MDE4ODc2MSwidGVuYW50IjoidGVuYW50LWEifQ.bWa5u7kDmYGZK--S0-E21PnmjhNv-rrWWxMKv_XyUTc
+X-KD-Tenant: tenant-a
+
+### Lookup person by email
+GET http://localhost:8080/v1/lookup/email/jane@example.com
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjAxOTIzNjEsImlhdCI6MTc2MDE4ODc2MSwidGVuYW50IjoidGVuYW50LWEifQ.bWa5u7kDmYGZK--S0-E21PnmjhNv-rrWWxMKv_XyUTc
+X-KD-Tenant: tenant-a
+
+### Review queue
+GET http://localhost:8080/v1/review?status=needs_review
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjAxOTIzNjEsImlhdCI6MTc2MDE4ODc2MSwidGVuYW50IjoidGVuYW50LWEifQ.bWa5u7kDmYGZK--S0-E21PnmjhNv-rrWWxMKv_XyUTc
+X-KD-Tenant: tenant-a
+
+### Review decision
+POST http://localhost:8080/v1/review/<RAW_ID>/decision
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjAxOTIzNjEsImlhdCI6MTc2MDE4ODc2MSwidGVuYW50IjoidGVuYW50LWEifQ.bWa5u7kDmYGZK--S0-E21PnmjhNv-rrWWxMKv_XyUTc
+X-KD-Tenant: tenant-a
+Content-Type: application/json
+
+{ "decision": "accept" }

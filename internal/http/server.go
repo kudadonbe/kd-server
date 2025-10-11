@@ -19,6 +19,10 @@ type Config struct {
 	VersionService services.VersionProvider
 	AuthVerifier   auth.Verifier
 	TenantHeader   string
+	IngestService  services.Ingestor
+	ResolveService services.Resolver
+	LookupService  services.Lookup
+	ReviewService  services.Review
 }
 
 // NewHandler wires the HTTP routes with basic middleware.
@@ -29,6 +33,22 @@ func NewHandler(cfg Config) http.Handler {
 
 	if cfg.AuthVerifier == nil {
 		panic("http: AuthVerifier is required")
+	}
+
+	if cfg.IngestService == nil {
+		panic("http: IngestService is required")
+	}
+
+	if cfg.ResolveService == nil {
+		panic("http: ResolveService is required")
+	}
+
+	if cfg.LookupService == nil {
+		panic("http: LookupService is required")
+	}
+
+	if cfg.ReviewService == nil {
+		panic("http: ReviewService is required")
 	}
 
 	mux := http.NewServeMux()
@@ -46,6 +66,12 @@ func NewHandler(cfg Config) http.Handler {
 	})
 
 	mux.Handle("/v1/version", authMiddleware(cfg)(versionHandler))
+	mux.Handle("/v1/ingest", authMiddleware(cfg)(ingestHandler(cfg)))
+	mux.Handle("/v1/resolve", authMiddleware(cfg)(resolveHandler(cfg)))
+	mux.Handle("/v1/lookup/phone/", authMiddleware(cfg)(lookupPhoneHandler(cfg)))
+	mux.Handle("/v1/lookup/email/", authMiddleware(cfg)(lookupEmailHandler(cfg)))
+	mux.Handle("/v1/review", authMiddleware(cfg)(reviewListHandler(cfg)))
+	mux.Handle("/v1/review/", authMiddleware(cfg)(reviewDecisionHandler(cfg)))
 
 	return loggingMiddleware(cfg.Logger)(mux)
 }
