@@ -43,3 +43,23 @@ type Link struct {
 	CreatedAt  time.Time          `bson:"createdAt"`
 	UpdatedAt  time.Time          `bson:"updatedAt"`
 }
+
+// Tenant represents a kd-server tenant.
+type Tenant struct {
+	ID        primitive.ObjectID `bson:"_id"`
+	Slug      string             `bson:"slug"`
+	Name      string             `bson:"name"`
+	CreatedAt time.Time          `bson:"createdAt"`
+	UpdatedAt time.Time          `bson:"updatedAt"`
+}
+
+// APIKey represents an API key record stored for a tenant.
+type APIKey struct {
+	ID        primitive.ObjectID `bson:"_id"`
+	TenantID  string             `bson:"tenantId"`
+	KeyID     string             `bson:"keyId"`
+	KeyHash   string             `bson:"keyHash"`
+	Label     string             `bson:"label,omitempty"`
+	CreatedAt time.Time          `bson:"createdAt"`
+	UpdatedAt time.Time          `bson:"updatedAt"`
+}

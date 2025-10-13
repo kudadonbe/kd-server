@@ -50,3 +50,17 @@ The request is authenticated via the headers above. Ingested records are written
 ## Review Queue (Stub)
 
 `GET /v1/review?status=needs_review` lists raw records that could not be matched deterministically. Use `POST /v1/review/{id}/decision` with `{ "decision": "accept" | "reject" }` to update their status.
+
+## Admin TUI
+
+Run `make tui` (or `go run ./cmd/tui`) to open the admin console for tenant onboarding:
+
+1. Create a tenant (provides slug + name).
+2. Issue a new API key — the secret is displayed once alongside an `.env` snippet:
+
+   ```
+   KD_TENANT=tenant-slug
+   KD_API_KEY=key_xxx.secret
+   ```
+
+3. Share the snippet with the team deploying the specific tenant.

@@ -4,13 +4,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/kudadonbe/kd-server/internal/services"
 	"go.mongodb.org/mongo-driver/mongo"
 )
-
-type lookupResponse struct {
-	Person services.PersonView `json:"data"`
-}
 
 func lookupPhoneHandler(cfg Config) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

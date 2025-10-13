@@ -258,8 +258,8 @@ func TestLookupPhoneRoute(t *testing.T) {
 
 	stub := &stubLookup{
 		view: &services.PersonView{
-			Person: store.Person{PersonID: "p1", TenantID: "tenant-a"},
-			Links:  []store.Link{{Source: "system"}},
+			Person: services.PersonPayload{PersonID: "p1", TenantID: "tenant-a"},
+			Links:  []services.LinkPayload{{Source: "system"}},
 		},
 	}
 

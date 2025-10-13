@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/kudadonbe/kd-server/internal/store"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -11,8 +12,29 @@ import (
 
 // PersonView represents the payload returned to clients for lookup responses.
 type PersonView struct {
-	Person store.Person `json:"person"`
-	Links  []store.Link `json:"links"`
+	Person PersonPayload `json:"person"`
+	Links  []LinkPayload `json:"links"`
+}
+
+// PersonPayload represents a resolved person in API responses.
+type PersonPayload struct {
+	PersonID     string         `json:"person_id"`
+	TenantID     string         `json:"tenant_id"`
+	NationalID   string         `json:"national_id,omitempty"`
+	PrimaryEmail string         `json:"primary_email,omitempty"`
+	PrimaryPhone string         `json:"primary_phone,omitempty"`
+	Attributes   map[string]any `json:"attributes,omitempty"`
+	CreatedAt    time.Time      `json:"created_at"`
+	UpdatedAt    time.Time      `json:"updated_at"`
+}
+
+// LinkPayload represents a link record in API responses.
+type LinkPayload struct {
+	Source     string         `json:"source"`
+	ExternalID string         `json:"external_id"`
+	Payload    map[string]any `json:"payload,omitempty"`
+	CreatedAt  time.Time      `json:"created_at"`
+	UpdatedAt  time.Time      `json:"updated_at"`
 }
 
 // LookupService exposes lookup functionality by identifier.
@@ -66,7 +88,40 @@ func (s *LookupService) fetch(ctx context.Context, tenantID string, finder func(
 		return nil, err
 	}
 
-	return &PersonView{Person: *person, Links: links}, nil
+	return &PersonView{
+		Person: toPersonPayload(person),
+		Links:  toLinkPayloads(links),
+	}, nil
 }
 
 var _ Lookup = (*LookupService)(nil)
+
+func toPersonPayload(p *store.Person) PersonPayload {
+	if p == nil {
+		return PersonPayload{}
+	}
+	return PersonPayload{
+		PersonID:     p.PersonID,
+		TenantID:     p.TenantID,
+		NationalID:   p.NationalID,
+		PrimaryEmail: p.PrimaryEmail,
+		PrimaryPhone: p.PrimaryPhone,
+		Attributes:   p.Attributes,
+		CreatedAt:    p.CreatedAt,
+		UpdatedAt:    p.UpdatedAt,
+	}
+}
+
+func toLinkPayloads(links []store.Link) []LinkPayload {
+	result := make([]LinkPayload, 0, len(links))
+	for _, link := range links {
+		result = append(result, LinkPayload{
+			Source:     link.Source,
+			ExternalID: link.ExternalID,
+			Payload:    link.Payload,
+			CreatedAt:  link.CreatedAt,
+			UpdatedAt:  link.UpdatedAt,
+		})
+	}
+	return result
+}
