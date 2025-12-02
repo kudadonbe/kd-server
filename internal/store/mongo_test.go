@@ -71,6 +71,67 @@ func TestDefaultIndexSpecs(t *testing.T) {
 				keys: bson.D{{Key: "keyHash", Value: 1}},
 			},
 		},
+		"assets": {
+			{
+				name:   "assets_number",
+				keys:   bson.D{{Key: "assetNo", Value: 1}},
+				unique: true,
+			},
+			{
+				name: "assets_tenant_number",
+				keys: bson.D{{Key: "tenantId", Value: 1}, {Key: "assetNo", Value: 1}},
+			},
+			{
+				name: "assets_number_sequence",
+				keys: bson.D{
+					{Key: "office", Value: 1},
+					{Key: "year", Value: 1},
+					{Key: "categoryNo", Value: 1},
+					{Key: "typeNumber", Value: 1},
+					{Key: "serialIncrement", Value: -1},
+				},
+			},
+			{
+				name: "assets_tenant_office",
+				keys: bson.D{{Key: "tenantId", Value: 1}, {Key: "office", Value: 1}},
+			},
+			{
+				name: "assets_tenant_category",
+				keys: bson.D{{Key: "tenantId", Value: 1}, {Key: "categoryNo", Value: 1}},
+			},
+			{
+				name: "assets_tenant_status",
+				keys: bson.D{{Key: "tenantId", Value: 1}, {Key: "status", Value: 1}},
+			},
+			{
+				name: "assets_tenant_acqdate",
+				keys: bson.D{{Key: "tenantId", Value: 1}, {Key: "acquisitionDate", Value: 1}},
+			},
+		},
+		"asset_links": {
+			{
+				name: "asset_links_asset",
+				keys: bson.D{{Key: "assetNo", Value: 1}},
+			},
+			{
+				name: "asset_links_tenant_asset",
+				keys: bson.D{{Key: "tenantId", Value: 1}, {Key: "assetNo", Value: 1}},
+			},
+			{
+				name: "asset_links_source_external",
+				keys: bson.D{{Key: "source", Value: 1}, {Key: "externalId", Value: 1}},
+			},
+		},
+		"asset_history": {
+			{
+				name: "asset_history_asset_time",
+				keys: bson.D{{Key: "assetNo", Value: 1}, {Key: "timestamp", Value: -1}},
+			},
+			{
+				name: "asset_history_tenant_event",
+				keys: bson.D{{Key: "tenantId", Value: 1}, {Key: "eventType", Value: 1}},
+			},
+		},
 	}
 
 	if len(specs) != len(expected) {

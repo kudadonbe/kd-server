@@ -191,6 +191,66 @@ func defaultIndexSpecs() map[string][]mongo.IndexModel {
 				Options: options.Index().SetName("keys_hash"),
 			},
 		},
+		"assets": {
+			{
+				Keys:    bson.D{{Key: "assetNo", Value: 1}},
+				Options: options.Index().SetName("assets_number").SetUnique(true),
+			},
+			{
+				Keys:    bson.D{{Key: "tenantId", Value: 1}, {Key: "assetNo", Value: 1}},
+				Options: options.Index().SetName("assets_tenant_number"),
+			},
+			{
+				Keys: bson.D{
+					{Key: "office", Value: 1},
+					{Key: "year", Value: 1},
+					{Key: "categoryNo", Value: 1},
+					{Key: "typeNumber", Value: 1},
+					{Key: "serialIncrement", Value: -1},
+				},
+				Options: options.Index().SetName("assets_number_sequence"),
+			},
+			{
+				Keys:    bson.D{{Key: "tenantId", Value: 1}, {Key: "office", Value: 1}},
+				Options: options.Index().SetName("assets_tenant_office"),
+			},
+			{
+				Keys:    bson.D{{Key: "tenantId", Value: 1}, {Key: "categoryNo", Value: 1}},
+				Options: options.Index().SetName("assets_tenant_category"),
+			},
+			{
+				Keys:    bson.D{{Key: "tenantId", Value: 1}, {Key: "status", Value: 1}},
+				Options: options.Index().SetName("assets_tenant_status"),
+			},
+			{
+				Keys:    bson.D{{Key: "tenantId", Value: 1}, {Key: "acquisitionDate", Value: 1}},
+				Options: options.Index().SetName("assets_tenant_acqdate"),
+			},
+		},
+		"asset_links": {
+			{
+				Keys:    bson.D{{Key: "assetNo", Value: 1}},
+				Options: options.Index().SetName("asset_links_asset"),
+			},
+			{
+				Keys:    bson.D{{Key: "tenantId", Value: 1}, {Key: "assetNo", Value: 1}},
+				Options: options.Index().SetName("asset_links_tenant_asset"),
+			},
+			{
+				Keys:    bson.D{{Key: "source", Value: 1}, {Key: "externalId", Value: 1}},
+				Options: options.Index().SetName("asset_links_source_external"),
+			},
+		},
+		"asset_history": {
+			{
+				Keys:    bson.D{{Key: "assetNo", Value: 1}, {Key: "timestamp", Value: -1}},
+				Options: options.Index().SetName("asset_history_asset_time"),
+			},
+			{
+				Keys:    bson.D{{Key: "tenantId", Value: 1}, {Key: "eventType", Value: 1}},
+				Options: options.Index().SetName("asset_history_tenant_event"),
+			},
+		},
 	}
 }
 

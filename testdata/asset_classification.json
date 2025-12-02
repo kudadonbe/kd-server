@@ -1,0 +1,401 @@
+{
+  "categories": [
+    {
+      "code": "01",
+      "name": "Land and Building",
+      "description": "Land parcels, residential & non-residential buildings",
+      "subcategories": [
+        {
+          "code": "10",
+          "name": "Land",
+          "types": [
+            {"code": "035", "name": "Agricultural"},
+            {"code": "036", "name": "Airports"},
+            {"code": "037", "name": "Beaches / Bikini Beaches"},
+            {"code": "038", "name": "Bus Parks / Stations"},
+            {"code": "039", "name": "Cemeteries"},
+            {"code": "040", "name": "Commercial"},
+            {"code": "041", "name": "Communication Towers"},
+            {"code": "042", "name": "Dumpsite / Waste Management Sites"},
+            {"code": "043", "name": "Education Sites"},
+            {"code": "044", "name": "Fuel Storage Sites"},
+            {"code": "045", "name": "Harbors / Jetties"},
+            {"code": "046", "name": "Offices"},
+            {"code": "047", "name": "Parks"},
+            {"code": "048", "name": "Playgrounds"},
+            {"code": "049", "name": "Reclaimed"},
+            {"code": "050", "name": "Residential"},
+            {"code": "051", "name": "Sports Facilities"},
+            {"code": "052", "name": "Tourism Sites"},
+            {"code": "053", "name": "Warehouse Sites"}
+          ]
+        },
+        {
+          "code": "11",
+          "name": "Residential Buildings",
+          "types": [
+            {"code": "061", "name": "Flats"},
+            {"code": "062", "name": "Other Residential Buildings"}
+          ]
+        },
+        {
+          "code": "12",
+          "name": "Non Residential Buildings",
+          "types": [
+            {"code": "063", "name": "Airports"},
+            {"code": "064", "name": "Bus Parks / Stations"},
+            {"code": "065", "name": "Communication Towers"},
+            {"code": "066", "name": "Dumpsites"},
+            {"code": "067", "name": "Harbors / Jetties"},
+            {"code": "068", "name": "Mosques"},
+            {"code": "069", "name": "Museums / Galleries"},
+            {"code": "070", "name": "Offices"},
+            {"code": "071", "name": "Warehouses"}
+          ]
+        }
+      ]
+    },
+    {
+      "code": "02",
+      "name": "Furniture, Fixtures and Fittings",
+      "description": "Office, school, hospital furniture",
+      "subcategories": [
+        {
+          "code": "13",
+          "name": "College Furniture",
+          "types": [
+            {"code": "073", "name": "Computer Table"},
+            {"code": "074", "name": "Desk / Table"},
+            {"code": "075", "name": "Chair"},
+            {"code": "076", "name": "Bookshelves / Rack (cupboard)"}
+          ]
+        },
+        {
+          "code": "14",
+          "name": "Hospital Furniture",
+          "types": [
+            {"code": "077", "name": "Hospital Bed"},
+            {"code": "078", "name": "Other Hospital Furniture"}
+          ]
+        },
+        {
+          "code": "15",
+          "name": "Office Furniture",
+          "types": [
+            {"code": "079", "name": "Executive Chair"},
+            {"code": "080", "name": "Bench"},
+            {"code": "081", "name": "Filling Cabinet"},
+            {"code": "082", "name": "Office Chair"},
+            {"code": "083", "name": "Office Cupboard"},
+            {"code": "084", "name": "Partitions"},
+            {"code": "085", "name": "Safe"},
+            {"code": "086", "name": "Table (Coffee / Side)"},
+            {"code": "087", "name": "Table (Meeting / Discussion)"},
+            {"code": "088", "name": "White Board"},
+            {"code": "089", "name": "Executive Table"},
+            {"code": "090", "name": "Conference Table"},
+            {"code": "091", "name": "Office Table"},
+            {"code": "092", "name": "Computer Table"},
+            {"code": "093", "name": "Reception Table / Counter"},
+            {"code": "094", "name": "Bookshelves / Rack (cupboard)"},
+            {"code": "095", "name": "Display Rack"},
+            {"code": "096", "name": "Pigeon Hole"},
+            {"code": "097", "name": "Shelves / Cupboards"}
+          ]
+        },
+        {
+          "code": "16",
+          "name": "School Furniture",
+          "types": [
+            {"code": "098", "name": "School Desk"},
+            {"code": "099", "name": "School Chair"}
+          ]
+        },
+        {
+          "code": "17",
+          "name": "Household Furniture",
+          "types": [
+            {"code": "100", "name": "Bed"},
+            {"code": "101", "name": "Cupboard"},
+            {"code": "102", "name": "Dining Table"},
+            {"code": "103", "name": "Sofa"}
+          ]
+        }
+      ]
+    },
+    {
+      "code": "03",
+      "name": "Equipment",
+      "description": "IT hardware, machinery, medical equipment",
+      "subcategories": [
+        {
+          "code": "19",
+          "name": "Hospital Equipment",
+          "types": [
+            {"code": "113", "name": "Ambulance Stretcher"},
+            {"code": "114", "name": "Defibrillator"},
+            {"code": "115", "name": "ECG / EKG Machine"},
+            {"code": "116", "name": "Patient Monitor"},
+            {"code": "117", "name": "Ultrasound Machine"},
+            {"code": "118", "name": "X-Ray Machine"}
+          ]
+        },
+        {
+          "code": "20",
+          "name": "Laboratory Equipment",
+          "types": [
+            {"code": "119", "name": "Autoclave"},
+            {"code": "120", "name": "Centrifuge"},
+            {"code": "121", "name": "Microscope"}
+          ]
+        },
+        {
+          "code": "21",
+          "name": "Office Equipment",
+          "types": [
+            {"code": "122", "name": "Air Conditioner"},
+            {"code": "123", "name": "CCTV Camera"},
+            {"code": "124", "name": "Fan"},
+            {"code": "125", "name": "Photocopier / Multi Function Printer"},
+            {"code": "126", "name": "Shredder"},
+            {"code": "127", "name": "Telephone System"},
+            {"code": "128", "name": "Water Dispenser"}
+          ]
+        },
+        {
+          "code": "22",
+          "name": "Communication Infrastructure",
+          "types": [
+            {"code": "129", "name": "PABX System"},
+            {"code": "130", "name": "Radio Communication System"},
+            {"code": "131", "name": "Satellite Equipment"},
+            {"code": "132", "name": "Telephone Exchange"}
+          ]
+        },
+        {
+          "code": "23",
+          "name": "IT-Related Hardware",
+          "types": [
+            {"code": "150", "name": "Computers"},
+            {"code": "151", "name": "Printers"},
+            {"code": "152", "name": "Projectors"},
+            {"code": "153", "name": "Scanners"},
+            {"code": "154", "name": "Screens"},
+            {"code": "155", "name": "Servers"},
+            {"code": "156", "name": "Switches"},
+            {"code": "157", "name": "Routers"},
+            {"code": "158", "name": "Firewall"},
+            {"code": "159", "name": "UPS"},
+            {"code": "160", "name": "Laptops"},
+            {"code": "161", "name": "Tablets"}
+          ]
+        }
+      ]
+    },
+    {
+      "code": "04",
+      "name": "Vehicular Equipment and Vehicles",
+      "description": "Cars, trucks, boats, heavy machinery",
+      "subcategories": [
+        {
+          "code": "24",
+          "name": "Vehicular Equipment",
+          "types": [
+            {"code": "193", "name": "Backhoe"},
+            {"code": "194", "name": "Bulldozer"},
+            {"code": "195", "name": "Compactor"},
+            {"code": "196", "name": "Crane"},
+            {"code": "197", "name": "Excavator"}
+          ]
+        },
+        {
+          "code": "25",
+          "name": "Motor Vehicles",
+          "types": [
+            {"code": "198", "name": "Buses"},
+            {"code": "199", "name": "Cars"},
+            {"code": "200", "name": "Fire Trucks"},
+            {"code": "201", "name": "Lorries"},
+            {"code": "202", "name": "Motor Bikes"},
+            {"code": "203", "name": "Pick up"},
+            {"code": "204", "name": "Trucks"},
+            {"code": "205", "name": "Vans"}
+          ]
+        },
+        {
+          "code": "26",
+          "name": "Ships and Boats",
+          "types": [
+            {"code": "206", "name": "Cargo Vessel"},
+            {"code": "207", "name": "Dinghy"},
+            {"code": "208", "name": "Ferry"},
+            {"code": "209", "name": "Fishing Vessel"},
+            {"code": "210", "name": "Launch"},
+            {"code": "211", "name": "Speed Boat"}
+          ]
+        },
+        {
+          "code": "27",
+          "name": "Other Vessels",
+          "types": [
+            {"code": "212", "name": "Barge"},
+            {"code": "213", "name": "Tug Boat"}
+          ]
+        },
+        {
+          "code": "28",
+          "name": "Aerospace Equipment",
+          "types": [
+            {"code": "214", "name": "Aircraft"},
+            {"code": "215", "name": "Helicopter"}
+          ]
+        }
+      ]
+    },
+    {
+      "code": "05",
+      "name": "Tools, Instrument and Apparatus",
+      "description": "Hand tools, instruments, apparatus",
+      "subcategories": [
+        {
+          "code": "29",
+          "name": "Apparatus",
+          "types": [
+            {"code": "216", "name": "Diving Equipment"},
+            {"code": "217", "name": "Firefighting Equipment"},
+            {"code": "218", "name": "Surveying Equipment"}
+          ]
+        },
+        {
+          "code": "30",
+          "name": "Instruments",
+          "types": [
+            {"code": "219", "name": "Musical Instruments"},
+            {"code": "220", "name": "Scientific Instruments"}
+          ]
+        },
+        {
+          "code": "31",
+          "name": "Tools",
+          "types": [
+            {"code": "221", "name": "Carpentry Tools"},
+            {"code": "222", "name": "Electrical Tools"},
+            {"code": "223", "name": "Gardening Tools"},
+            {"code": "224", "name": "Masonry Tools"},
+            {"code": "225", "name": "Plumbing Tools"}
+          ]
+        }
+      ]
+    },
+    {
+      "code": "06",
+      "name": "Copy Rights and Patents",
+      "description": "Intellectual property",
+      "subcategories": [
+        {
+          "code": "32",
+          "name": "Software",
+          "types": [
+            {"code": "226", "name": "Application Software"},
+            {"code": "227", "name": "Operating System"}
+          ]
+        },
+        {
+          "code": "33",
+          "name": "Patents",
+          "types": [
+            {"code": "228", "name": "Design Patents"},
+            {"code": "229", "name": "Utility Patents"}
+          ]
+        }
+      ]
+    },
+    {
+      "code": "07",
+      "name": "Heritage Assets",
+      "description": "Cultural and historical assets",
+      "subcategories": [
+        {
+          "code": "34",
+          "name": "Historical Buildings",
+          "types": [
+            {"code": "230", "name": "Monuments"},
+            {"code": "231", "name": "Historical Sites"}
+          ]
+        },
+        {
+          "code": "35",
+          "name": "Artifacts",
+          "types": [
+            {"code": "232", "name": "Artwork"},
+            {"code": "233", "name": "Archaeological Items"}
+          ]
+        }
+      ]
+    },
+    {
+      "code": "08",
+      "name": "Lagoons and Islands",
+      "description": "Natural resources",
+      "subcategories": [
+        {
+          "code": "36",
+          "name": "Lagoons",
+          "types": [
+            {"code": "234", "name": "Natural Lagoons"},
+            {"code": "235", "name": "Protected Lagoons"}
+          ]
+        },
+        {
+          "code": "37",
+          "name": "Islands",
+          "types": [
+            {"code": "236", "name": "Inhabited Islands"},
+            {"code": "237", "name": "Uninhabited Islands"},
+            {"code": "238", "name": "Resort Islands"}
+          ]
+        }
+      ]
+    },
+    {
+      "code": "09",
+      "name": "Reference Books & Exhibition",
+      "description": "Library and exhibition materials",
+      "subcategories": [
+        {
+          "code": "38",
+          "name": "Books",
+          "types": [
+            {"code": "239", "name": "Reference Books"},
+            {"code": "240", "name": "Textbooks"},
+            {"code": "241", "name": "Journals"}
+          ]
+        },
+        {
+          "code": "39",
+          "name": "Exhibition Materials",
+          "types": [
+            {"code": "242", "name": "Display Items"},
+            {"code": "243", "name": "Educational Materials"}
+          ]
+        }
+      ]
+    },
+    {
+      "code": "290",
+      "name": "Non Asset Inventory",
+      "description": "Items not capitalized as assets",
+      "subcategories": [
+        {
+          "code": "40",
+          "name": "Consumables",
+          "types": [
+            {"code": "244", "name": "Office Supplies"},
+            {"code": "245", "name": "Cleaning Supplies"},
+            {"code": "246", "name": "Stationery"}
+          ]
+        }
+      ]
+    }
+  ]
+}

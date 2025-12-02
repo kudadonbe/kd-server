@@ -15,14 +15,16 @@ const tenantHeader = "X-KD-Tenant"
 
 // Config configures the HTTP handler stack.
 type Config struct {
-	Logger         *log.Logger
-	VersionService services.VersionProvider
-	AuthVerifier   auth.Verifier
-	TenantHeader   string
-	IngestService  services.Ingestor
-	ResolveService services.Resolver
-	LookupService  services.Lookup
-	ReviewService  services.Review
+	Logger                *log.Logger
+	VersionService        services.VersionProvider
+	AuthVerifier          auth.Verifier
+	TenantHeader          string
+	IngestService         services.Ingestor
+	ResolveService        services.Resolver
+	LookupService         services.Lookup
+	ReviewService         services.Review
+	AssetService          *services.AssetService
+	ClassificationService *services.ClassificationService
 }
 
 // NewHandler wires the HTTP routes with basic middleware.
@@ -72,6 +74,32 @@ func NewHandler(cfg Config) http.Handler {
 	mux.Handle("/v1/lookup/email/", authMiddleware(cfg)(lookupEmailHandler(cfg)))
 	mux.Handle("/v1/review", authMiddleware(cfg)(reviewListHandler(cfg)))
 	mux.Handle("/v1/review/", authMiddleware(cfg)(reviewDecisionHandler(cfg)))
+
+	// Asset management endpoints
+	if cfg.AssetService != nil {
+		mux.Handle("/v1/ingest/assets", authMiddleware(cfg)(assetIngestHandler(cfg)))
+		mux.Handle("/v1/lookup/asset/", authMiddleware(cfg)(assetLookupHandler(cfg)))
+		mux.Handle("/v1/assets", authMiddleware(cfg)(assetsQueryHandler(cfg)))
+
+		// Note: Order matters - more specific routes first
+		mux.HandleFunc("/v1/assets/", func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasSuffix(r.URL.Path, "/history") {
+				authMiddleware(cfg)(assetHistoryHandler(cfg)).ServeHTTP(w, r)
+			} else if strings.HasSuffix(r.URL.Path, "/transfer") && r.Method == "POST" {
+				authMiddleware(cfg)(assetTransferHandler(cfg)).ServeHTTP(w, r)
+			} else if strings.HasSuffix(r.URL.Path, "/dispose") && r.Method == "POST" {
+				authMiddleware(cfg)(assetDisposeHandler(cfg)).ServeHTTP(w, r)
+			} else {
+				writeJSON(w, http.StatusNotFound, map[string]string{"error": "not found"})
+			}
+		})
+	}
+
+	// Asset classification endpoints
+	if cfg.ClassificationService != nil {
+		mux.Handle("/v1/assets/categories/", authMiddleware(cfg)(assetCategoryTypesHandler(cfg)))
+		mux.Handle("/v1/assets/categories", authMiddleware(cfg)(assetCategoriesHandler(cfg)))
+	}
 
 	return loggingMiddleware(cfg.Logger)(mux)
 }

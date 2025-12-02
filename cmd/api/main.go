@@ -82,14 +82,25 @@ func main() {
 	resolveService := services.NewResolveService(mongoStore)
 	lookupService := services.NewLookupService(mongoStore)
 	reviewService := services.NewReviewService(mongoStore)
+	assetService := services.NewAssetService(mongoStore)
+
+	classificationService, err := services.NewClassificationService()
+	if err != nil {
+		logger.Printf("warning: classification service init failed: %v", err)
+	} else {
+		assetService.SetClassificationService(classificationService)
+	}
+
 	handler := apphttp.NewHandler(apphttp.Config{
-		Logger:         logger,
-		VersionService: versionService,
-		AuthVerifier:   authVerifier,
-		IngestService:  ingestService,
-		ResolveService: resolveService,
-		LookupService:  lookupService,
-		ReviewService:  reviewService,
+		Logger:                logger,
+		VersionService:        versionService,
+		AuthVerifier:          authVerifier,
+		IngestService:         ingestService,
+		ResolveService:        resolveService,
+		LookupService:         lookupService,
+		ReviewService:         reviewService,
+		AssetService:          assetService,
+		ClassificationService: classificationService,
 	})
 
 	server := &http.Server{

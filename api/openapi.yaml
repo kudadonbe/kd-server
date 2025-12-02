@@ -280,6 +280,242 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /ingest/assets:
+    post:
+      summary: Ingest asset records
+      description: |
+        Ingest fixed asset records using IPSAS 17 classification.
+        Generates asset numbers in format: {office}-{year}-{catNo}-{typeNumber}-{serialIncrement}
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetIngestRequest'
+      responses:
+        '200':
+          description: Assets ingested successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetIngestResponse'
+        '400':
+          description: Invalid payload or validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Tenant mismatch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /lookup/asset/{assetNo}:
+    get:
+      summary: Lookup asset by asset number
+      description: Retrieves a single asset by its unique asset number
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: assetNo
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[A-Z0-9]{2,4}-\d{4}-(0[1-9]|290)-\d{3}-\d{4}$'
+          example: B15-2024-02-073-0001
+          description: Asset number in format {office}-{year}-{catNo}-{typeNumber}-{serial}
+      responses:
+        '200':
+          description: Asset found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetView'
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Tenant mismatch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Asset not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /assets:
+    get:
+      summary: Query assets
+      description: List and filter assets by various criteria
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: office
+          in: query
+          schema:
+            type: string
+          example: B15
+          description: Filter by office code
+        - name: categoryNo
+          in: query
+          schema:
+            type: string
+            pattern: '^(0[1-9]|290)$'
+          example: "02"
+          description: Filter by category number
+        - name: typeNumber
+          in: query
+          schema:
+            type: string
+            pattern: '^\d{3}$'
+          example: "073"
+          description: Filter by type number
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, disposed, under_maintenance, transferred, stolen, damaged]
+          description: Filter by asset status
+        - name: acquisitionDateFrom
+          in: query
+          schema:
+            type: string
+            format: date
+          example: "2024-01-01"
+          description: Filter by acquisition date (from)
+        - name: acquisitionDateTo
+          in: query
+          schema:
+            type: string
+            format: date
+          example: "2024-12-31"
+          description: Filter by acquisition date (to)
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Number of results to return
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Offset for pagination
+      responses:
+        '200':
+          description: Assets list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetListResponse'
+        '400':
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Tenant mismatch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /assets/categories:
+    get:
+      summary: Get asset classification hierarchy
+      description: Returns the complete asset category and type classification structure
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      responses:
+        '200':
+          description: Classification hierarchy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetCategoriesResponse'
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Tenant mismatch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /assets/categories/{catNo}/types:
+    get:
+      summary: Get asset types for a category
+      description: Returns subcategories and type codes for a specific category
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: catNo
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^(0[1-9]|290)$'
+          example: "02"
+          description: Category number
+      responses:
+        '200':
+          description: Category types
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetTypesResponse'
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Tenant mismatch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Category not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   securitySchemes:
     bearerAuth:
@@ -487,3 +723,477 @@ components:
           example: updated
       required:
         - status
+    AssetIngestRequest:
+      type: object
+      properties:
+        source:
+          $ref: '#/components/schemas/IngestSource'
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssetRecord'
+      required:
+        - source
+        - records
+    AssetRecord:
+      type: object
+      properties:
+        office:
+          type: string
+          pattern: '^[A-Z0-9]{2,4}$'
+          example: B15
+          description: Office or location code
+        categoryNo:
+          type: string
+          pattern: '^(0[1-9]|290)$'
+          example: "02"
+          description: Main category number
+        subCategoryNo:
+          type: string
+          pattern: '^\d{2}$'
+          example: "13"
+          description: Subcategory number (optional)
+        typeNumber:
+          type: string
+          pattern: '^\d{3}$'
+          example: "073"
+          description: Asset type code
+        description1:
+          type: string
+          maxLength: 200
+          example: Computer Table
+          description: Primary description
+        description2:
+          type: string
+          maxLength: 200
+          example: Wooden desk with keyboard tray
+          description: Secondary description (optional)
+        useOfAsset:
+          type: string
+          maxLength: 500
+          example: Student computer lab workstation
+          description: Purpose of the asset
+        location:
+          type: string
+          maxLength: 200
+          example: B15 - Hulhumale School Computer Lab
+          description: Physical location
+        quantity:
+          type: integer
+          minimum: 1
+          default: 1
+          example: 10
+          description: Number of identical assets to create
+        vendor:
+          type: string
+          maxLength: 200
+          example: Office Supplies Pvt Ltd
+        manufacturer:
+          type: string
+          maxLength: 200
+          example: Local Furniture Co
+        isPurchasedNew:
+          type: boolean
+          default: true
+          description: True if purchased new, false if used
+        acquisitionDate:
+          type: string
+          format: date
+          example: "2024-01-15"
+          description: Date asset was acquired
+        useCommenceDate:
+          type: string
+          format: date
+          example: "2024-02-01"
+          description: Date asset was put into use
+        countryOfOrigin:
+          type: string
+          maxLength: 100
+          example: Maldives
+        typeBrand:
+          type: string
+          maxLength: 200
+          example: Standard Computer Desk
+        originalValue:
+          type: number
+          format: float
+          minimum: 0
+          example: 5000.00
+          description: Purchase price or original value
+        currency:
+          type: string
+          default: MVR
+          example: MVR
+          description: Currency code
+        usefulLifeYears:
+          type: integer
+          minimum: 1
+          example: 10
+          description: Expected useful life in years
+        depreciationMethod:
+          type: string
+          default: straight-line
+          example: straight-line
+          description: Depreciation calculation method
+        residualValue:
+          type: number
+          format: float
+          minimum: 0
+          example: 500.00
+          description: Expected value at end of useful life
+        businessArea:
+          type: string
+          maxLength: 100
+          example: Education
+        costCentre:
+          type: string
+          maxLength: 50
+          example: CC001
+        creationFormNo:
+          type: string
+          maxLength: 50
+          example: MG/PR02/2024/0123
+          description: Reference to asset creation form
+        requestedBy:
+          $ref: '#/components/schemas/AssetApproval'
+        authorizedBy:
+          $ref: '#/components/schemas/AssetApproval'
+        sapAssetMasterId:
+          type: string
+          maxLength: 50
+          description: SAP system asset master ID
+        attributes:
+          type: object
+          additionalProperties: {}
+          description: Additional flexible attributes
+      required:
+        - office
+        - categoryNo
+        - typeNumber
+        - description1
+        - originalValue
+        - acquisitionDate
+        - location
+    AssetApproval:
+      type: object
+      properties:
+        userId:
+          type: string
+          example: USER001
+        name:
+          type: string
+          example: Ahmed Ali
+        designation:
+          type: string
+          example: Admin Officer
+        date:
+          type: string
+          format: date
+          example: "2024-01-10"
+    AssetIngestResponse:
+      type: object
+      properties:
+        created:
+          type: integer
+          example: 5
+          description: Number of assets created
+        assetNumbers:
+          type: array
+          items:
+            type: string
+          example: ["B15-2024-02-073-0001", "B15-2024-02-073-0002"]
+          description: Generated asset numbers
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssetError'
+          description: Validation or processing errors
+      required:
+        - created
+        - assetNumbers
+        - errors
+    AssetError:
+      type: object
+      properties:
+        recordIndex:
+          type: integer
+          example: 0
+        field:
+          type: string
+          example: categoryNo
+        message:
+          type: string
+          example: Invalid category number
+    AssetView:
+      type: object
+      properties:
+        asset:
+          $ref: '#/components/schemas/Asset'
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssetLink'
+          description: Links to source systems
+      required:
+        - asset
+        - links
+    Asset:
+      type: object
+      properties:
+        assetNo:
+          type: string
+          example: B15-2024-02-073-0001
+          description: Unique asset number
+        tenantId:
+          type: string
+        office:
+          type: string
+          example: B15
+        year:
+          type: integer
+          example: 2024
+        categoryNo:
+          type: string
+          example: "02"
+        categoryName:
+          type: string
+          example: Furniture, Fixtures and Fittings
+        subCategoryNo:
+          type: string
+          example: "13"
+        subCategoryName:
+          type: string
+          example: College Furniture
+        typeNumber:
+          type: string
+          example: "073"
+        typeName:
+          type: string
+          example: Computer Table
+        serialIncrement:
+          type: string
+          example: "0001"
+        description1:
+          type: string
+          example: Computer Table
+        description2:
+          type: string
+          example: Wooden desk with keyboard tray
+        useOfAsset:
+          type: string
+          example: Student computer lab workstation
+        location:
+          type: string
+          example: B15 - Hulhumale School Computer Lab
+        quantity:
+          type: integer
+          example: 1
+        vendor:
+          type: string
+          example: Office Supplies Pvt Ltd
+        manufacturer:
+          type: string
+          example: Local Furniture Co
+        isPurchasedNew:
+          type: boolean
+          example: true
+        acquisitionDate:
+          type: string
+          format: date
+          example: "2024-01-15"
+        useCommenceDate:
+          type: string
+          format: date
+          example: "2024-02-01"
+        countryOfOrigin:
+          type: string
+          example: Maldives
+        typeBrand:
+          type: string
+          example: Standard Computer Desk
+        originalValue:
+          type: number
+          format: float
+          example: 5000.00
+        currency:
+          type: string
+          example: MVR
+        usefulLifeYears:
+          type: integer
+          example: 10
+        depreciationMethod:
+          type: string
+          example: straight-line
+        residualValue:
+          type: number
+          format: float
+          example: 500.00
+        businessArea:
+          type: string
+          example: Education
+        costCentre:
+          type: string
+          example: CC001
+        creationFormNo:
+          type: string
+          example: MG/PR02/2024/0123
+        status:
+          type: string
+          enum: [active, disposed, under_maintenance, transferred, stolen, damaged]
+          example: active
+        barcodeId:
+          type: string
+          example: BC-B15-2024-02-073-0001
+        requestedBy:
+          $ref: '#/components/schemas/AssetApproval'
+        authorizedBy:
+          $ref: '#/components/schemas/AssetApproval'
+        sapAssetMasterId:
+          type: string
+        attributes:
+          type: object
+          additionalProperties: {}
+        createdAt:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:00:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:00:00Z"
+        createdBy:
+          type: string
+          example: USER001
+      required:
+        - assetNo
+        - tenantId
+        - office
+        - year
+        - categoryNo
+        - typeNumber
+        - description1
+        - originalValue
+        - acquisitionDate
+        - location
+        - status
+        - createdAt
+        - updatedAt
+    AssetLink:
+      type: object
+      properties:
+        source:
+          type: string
+          example: sap-system
+        externalId:
+          type: string
+          example: SAP001234
+        payload:
+          type: object
+          additionalProperties: {}
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - source
+        - externalId
+        - createdAt
+        - updatedAt
+    AssetListResponse:
+      type: object
+      properties:
+        assets:
+          type: array
+          items:
+            $ref: '#/components/schemas/Asset'
+        total:
+          type: integer
+          example: 150
+          description: Total matching assets
+        limit:
+          type: integer
+          example: 20
+        offset:
+          type: integer
+          example: 0
+      required:
+        - assets
+        - total
+        - limit
+        - offset
+    AssetCategoriesResponse:
+      type: object
+      properties:
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssetCategory'
+      required:
+        - categories
+    AssetCategory:
+      type: object
+      properties:
+        code:
+          type: string
+          example: "02"
+        name:
+          type: string
+          example: Furniture, Fixtures and Fittings
+        description:
+          type: string
+          example: Office, school, hospital furniture
+        subcategories:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssetSubcategory'
+      required:
+        - code
+        - name
+    AssetSubcategory:
+      type: object
+      properties:
+        code:
+          type: string
+          example: "13"
+        name:
+          type: string
+          example: College Furniture
+        types:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssetType'
+      required:
+        - code
+        - name
+    AssetType:
+      type: object
+      properties:
+        code:
+          type: string
+          example: "073"
+        name:
+          type: string
+          example: Computer Table
+      required:
+        - code
+        - name
+    AssetTypesResponse:
+      type: object
+      properties:
+        categoryNo:
+          type: string
+          example: "02"
+        categoryName:
+          type: string
+          example: Furniture, Fixtures and Fittings
+        subcategories:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssetSubcategory'
+      required:
+        - categoryNo
+        - categoryName
+        - subcategories
+

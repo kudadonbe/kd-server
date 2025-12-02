@@ -76,9 +76,9 @@ func main() {
 		case "4":
 			fmt.Println("Goodbye!")
 			return
-        default:
-            fmt.Println("Unknown option, please choose 1-4.")
-            fmt.Println()
+		default:
+			fmt.Println("Unknown option, please choose 1-4.")
+			fmt.Println()
 		}
 	}
 }
@@ -96,15 +96,15 @@ func listTenants(ctx context.Context, mongoStore *store.MongoStore) error {
 	if err != nil {
 		return err
 	}
-    if len(tenants) == 0 {
-        fmt.Println()
-        fmt.Println("No tenants found.")
-        fmt.Println()
-        return nil
-    }
+	if len(tenants) == 0 {
+		fmt.Println()
+		fmt.Println("No tenants found.")
+		fmt.Println()
+		return nil
+	}
 
-    fmt.Println()
-    fmt.Printf("%-4s %-20s %-25s %-20s\n", "#", "Slug", "Name", "Created At")
+	fmt.Println()
+	fmt.Printf("%-4s %-20s %-25s %-20s\n", "#", "Slug", "Name", "Created At")
 	fmt.Println(strings.Repeat("-", 70))
 	for idx, tenant := range tenants {
 		fmt.Printf("%-4d %-20s %-25s %-20s\n",
@@ -114,13 +114,13 @@ func listTenants(ctx context.Context, mongoStore *store.MongoStore) error {
 			tenant.CreatedAt.Format(time.RFC3339),
 		)
 	}
-    fmt.Println()
-    return nil
+	fmt.Println()
+	return nil
 }
 
 func createTenant(ctx context.Context, mongoStore *store.MongoStore, reader *bufio.Reader) error {
-    fmt.Println()
-    fmt.Println("Create Tenant")
+	fmt.Println()
+	fmt.Println("Create Tenant")
 	name := prompt(reader, "Friendly name (e.g. Acme Co)")
 	defaultSlug := slugify(name)
 	slug := promptDefault(reader, "Slug (lowercase, no spaces)", defaultSlug)
@@ -133,9 +133,9 @@ func createTenant(ctx context.Context, mongoStore *store.MongoStore, reader *buf
 		return err
 	}
 
-    fmt.Println()
-    fmt.Printf("Tenant created: %s (%s)\n", tenant.Name, tenant.Slug)
-    fmt.Println()
+	fmt.Println()
+	fmt.Printf("Tenant created: %s (%s)\n", tenant.Name, tenant.Slug)
+	fmt.Println()
 	return nil
 }
 
@@ -144,15 +144,15 @@ func issueKey(ctx context.Context, mongoStore *store.MongoStore, reader *bufio.R
 	if err != nil {
 		return err
 	}
-    if len(tenants) == 0 {
-        fmt.Println()
-        fmt.Println("No tenants available. Create a tenant first.")
-        fmt.Println()
-        return nil
-    }
+	if len(tenants) == 0 {
+		fmt.Println()
+		fmt.Println("No tenants available. Create a tenant first.")
+		fmt.Println()
+		return nil
+	}
 
-    fmt.Println()
-    fmt.Println("Select tenant for API key:")
+	fmt.Println()
+	fmt.Println("Select tenant for API key:")
 	for idx, tenant := range tenants {
 		fmt.Printf(" %d) %s (%s)\n", idx+1, tenant.Name, tenant.Slug)
 	}
@@ -173,20 +173,20 @@ func issueKey(ctx context.Context, mongoStore *store.MongoStore, reader *bufio.R
 		return err
 	}
 
-    fmt.Println()
-    fmt.Println("API Key issued!")
+	fmt.Println()
+	fmt.Println("API Key issued!")
 	fmt.Printf("Tenant: %s (%s)\n", issued.Tenant.Name, issued.Tenant.Slug)
 	fmt.Printf("Key ID: %s\n", issued.KeyID)
 	fmt.Printf("Label: %s\n", issued.Label)
-    fmt.Println()
-    fmt.Println("Secret (store this securely, it will not be shown again):")
+	fmt.Println()
+	fmt.Println("Secret (store this securely, it will not be shown again):")
 	fmt.Println(issued.Secret)
 
-    fmt.Println()
-    fmt.Println(".env snippet:")
+	fmt.Println()
+	fmt.Println(".env snippet:")
 	fmt.Printf("KD_TENANT=%s\n", issued.Tenant.Slug)
-    fmt.Printf("KD_API_KEY=%s\n", issued.Secret)
-    fmt.Println()
+	fmt.Printf("KD_API_KEY=%s\n", issued.Secret)
+	fmt.Println()
 	return nil
 }
 
