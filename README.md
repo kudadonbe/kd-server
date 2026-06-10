@@ -12,16 +12,22 @@ cp .env.example .env
 
 - `MONGO_URI` points to your MongoDB instance (defaults to `mongodb://localhost:27017` for local development).
 - `MONGO_DB` is the database name the API uses (defaults to `kdserver`).
-- `JWT_SIGNING_KEY` holds the HS256 secret used to validate Bearer tokens; set a unique value per environment.
+- `JWT_SIGNING_KEY` holds the HS256 secret used to validate JWT bearer tokens; set a unique value per environment.
+- `PORT` selects the API port. The example uses `18080` for local development; deployments should set the port required by their environment.
+- `KD_ADMIN_USERNAME` and `KD_ADMIN_PASSWORD` protect the browser-based tenant administration console at `/admin`.
 
-When you run `make run` or start the API manually, these variables configure the Mongo connection used during startup.
+The API and admin TUI automatically load `.env` from the current working directory for local development. Existing process environment variables take precedence over values in `.env`.
+
+## Web Administration
+
+Open `http://localhost:18080/admin` and sign in with the configured admin username and password to list, create, and rename tenants, issue API keys, and revoke keys. Tenant slugs remain immutable so existing data and API keys continue to work. Admin credentials are separate from tenant credentials and must not be shared with tenant applications.
 
 ## Authentication
 
-Non-health API routes require two headers:
+Non-health API routes require two headers. The bearer credential can be either a TUI-issued API key or an HS256 JWT:
 
-- `Authorization: Bearer <jwt>` where the token is signed with `JWT_SIGNING_KEY` and contains a `tenant` claim.
-- `X-KD-Tenant: <tenant-slug>` matching the `tenant` claim in the token.
+- `Authorization: Bearer <api-key>` where the key was issued for the requested tenant, or `Bearer <jwt>` where the JWT contains a matching `tenant` claim.
+- `X-KD-Tenant: <tenant-slug>` matching the API key tenant or JWT tenant claim.
 
 ## Ingest Workflow
 
@@ -63,4 +69,5 @@ Run `make tui` (or `go run ./cmd/tui`) to open the admin console for tenant onbo
    KD_API_KEY=key_xxx.secret
    ```
 
-3. Share the snippet with the team deploying the specific tenant.
+3. Revoke API keys that are exposed or no longer needed.
+4. Share active credentials only with the team deploying the specific tenant.

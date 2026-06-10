@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/kudadonbe/kd-server/internal/auth"
+	"github.com/kudadonbe/kd-server/internal/config"
 	apphttp "github.com/kudadonbe/kd-server/internal/http"
 	"github.com/kudadonbe/kd-server/internal/services"
 	"github.com/kudadonbe/kd-server/internal/store"
@@ -26,6 +28,10 @@ const (
 
 func main() {
 	logger := log.New(os.Stdout, "", log.LstdFlags|log.LUTC)
+
+	if err := config.LoadDotEnv(); err != nil {
+		logger.Fatalf("configuration load failed: %v", err)
+	}
 
 	addr := defaultAddr
 	if port := os.Getenv("PORT"); port != "" {
@@ -83,6 +89,7 @@ func main() {
 	lookupService := services.NewLookupService(mongoStore)
 	reviewService := services.NewReviewService(mongoStore)
 	assetService := services.NewAssetService(mongoStore)
+	adminService := services.NewAdminService(mongoStore)
 
 	classificationService, err := services.NewClassificationService()
 	if err != nil {
@@ -95,12 +102,16 @@ func main() {
 		Logger:                logger,
 		VersionService:        versionService,
 		AuthVerifier:          authVerifier,
+		APIKeyVerifier:        mongoStore,
 		IngestService:         ingestService,
 		ResolveService:        resolveService,
 		LookupService:         lookupService,
 		ReviewService:         reviewService,
 		AssetService:          assetService,
 		ClassificationService: classificationService,
+		AdminService:          adminService,
+		AdminUsername:         os.Getenv("KD_ADMIN_USERNAME"),
+		AdminPassword:         os.Getenv("KD_ADMIN_PASSWORD"),
 	})
 
 	server := &http.Server{
@@ -108,11 +119,27 @@ func main() {
 		Handler: handler,
 	}
 
-	logger.Printf("starting kd-server api on %s", addr)
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		logger.Fatalf("api listen failed on %s: %v", addr, err)
+	}
+
+	baseURL := localBaseURL(addr)
+	adminConfigured := os.Getenv("KD_ADMIN_USERNAME") != "" && os.Getenv("KD_ADMIN_PASSWORD") != ""
+	logger.Println("------------------------------------------------------------")
+	logger.Printf("KD-Server %s is ready", appVersion)
+	logger.Printf("API:       %s", baseURL)
+	logger.Printf("Home:      %s/", baseURL)
+	logger.Printf("Admin:     %s/admin", baseURL)
+	logger.Printf("Health:    %s/v1/healthz", baseURL)
+	logger.Printf("MongoDB:   %s", mongoDatabase)
+	logger.Printf("Admin UI:  %s", enabledLabel(adminConfigured))
+	logger.Println("Press Ctrl+C to stop")
+	logger.Println("------------------------------------------------------------")
 
 	errCh := make(chan error, 1)
 	go func() {
-		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}
 	}()
@@ -135,4 +162,18 @@ func main() {
 	}
 
 	logger.Println("server stopped cleanly")
+}
+
+func localBaseURL(addr string) string {
+	if len(addr) > 0 && addr[0] == ':' {
+		return "http://localhost" + addr
+	}
+	return "http://" + addr
+}
+
+func enabledLabel(enabled bool) string {
+	if enabled {
+		return "enabled"
+	}
+	return "not configured"
 }

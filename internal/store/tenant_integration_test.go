@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 )
@@ -14,7 +15,7 @@ func TestTenantLifecycle(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	dbName := "kdserver_test_tenant_" + time.Now().Format("20060102_150405")
+	dbName := fmt.Sprintf("kdserver_test_tenant_%d", time.Now().UnixNano())
 
 	mongoStore, err := Connect(ctx, Config{
 		URI:      defaultURI,
@@ -67,5 +68,28 @@ func TestTenantLifecycle(t *testing.T) {
 	}
 	if issued.Tenant.Slug != tenant.Slug {
 		t.Fatalf("tenant mismatch")
+	}
+
+	updatedTenant, err := mongoStore.UpdateTenantName(ctx, tenant.Slug, "Acme Company")
+	if err != nil {
+		t.Fatalf("update tenant name: %v", err)
+	}
+	if updatedTenant.Name != "Acme Company" || updatedTenant.Slug != tenant.Slug {
+		t.Fatalf("unexpected updated tenant: %#v", updatedTenant)
+	}
+	if err := mongoStore.VerifyAPIKey(ctx, tenant.Slug, issued.Secret); err != nil {
+		t.Fatalf("verify API key after tenant edit: %v", err)
+	}
+	if err := mongoStore.VerifyAPIKey(ctx, "other-tenant", issued.Secret); err == nil {
+		t.Fatal("expected tenant mismatch to reject API key")
+	}
+	if err := mongoStore.VerifyAPIKey(ctx, tenant.Slug, issued.Secret+"invalid"); err == nil {
+		t.Fatal("expected invalid secret to reject API key")
+	}
+	if err := mongoStore.RevokeAPIKey(ctx, tenant.Slug, issued.KeyID); err != nil {
+		t.Fatalf("revoke API key: %v", err)
+	}
+	if err := mongoStore.VerifyAPIKey(ctx, tenant.Slug, issued.Secret); err == nil {
+		t.Fatal("expected revoked API key to be rejected")
 	}
 }

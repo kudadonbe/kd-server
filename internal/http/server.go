@@ -18,6 +18,7 @@ type Config struct {
 	Logger                *log.Logger
 	VersionService        services.VersionProvider
 	AuthVerifier          auth.Verifier
+	APIKeyVerifier        auth.APIKeyVerifier
 	TenantHeader          string
 	IngestService         services.Ingestor
 	ResolveService        services.Resolver
@@ -25,6 +26,9 @@ type Config struct {
 	ReviewService         services.Review
 	AssetService          *services.AssetService
 	ClassificationService *services.ClassificationService
+	AdminService          *services.AdminService
+	AdminUsername         string
+	AdminPassword         string
 }
 
 // NewHandler wires the HTTP routes with basic middleware.
@@ -35,6 +39,10 @@ func NewHandler(cfg Config) http.Handler {
 
 	if cfg.AuthVerifier == nil {
 		panic("http: AuthVerifier is required")
+	}
+
+	if cfg.APIKeyVerifier == nil {
+		panic("http: APIKeyVerifier is required")
 	}
 
 	if cfg.IngestService == nil {
@@ -55,6 +63,12 @@ func NewHandler(cfg Config) http.Handler {
 
 	mux := http.NewServeMux()
 
+	mux.HandleFunc("/", landingHandler)
+	mux.HandleFunc("/admin", adminPageHandler)
+	if cfg.AdminService != nil {
+		adminAuth := newAdminAuthenticator(cfg.AdminUsername, cfg.AdminPassword)
+		mux.Handle("/admin/api/", adminAPIHandler(cfg, adminAuth))
+	}
 	mux.HandleFunc("/v1/healthz", healthHandler)
 
 	versionHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -175,6 +189,17 @@ func authMiddleware(cfg Config) func(http.Handler) http.Handler {
 			}
 
 			token := strings.TrimSpace(authHeader[7:])
+			if strings.HasPrefix(token, "key_") {
+				if err := cfg.APIKeyVerifier.VerifyAPIKey(r.Context(), tenantID, token); err != nil {
+					writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid API key"})
+					return
+				}
+
+				ctx := ContextWithTenant(r.Context(), tenantID)
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
+
 			claims, err := cfg.AuthVerifier.Verify(r.Context(), token)
 			if err != nil {
 				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid token"})

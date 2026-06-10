@@ -60,6 +60,7 @@ type APIKey struct {
 	KeyID     string             `bson:"keyId"`
 	KeyHash   string             `bson:"keyHash"`
 	Label     string             `bson:"label,omitempty"`
+	RevokedAt *time.Time         `bson:"revokedAt,omitempty"`
 	CreatedAt time.Time          `bson:"createdAt"`
 	UpdatedAt time.Time          `bson:"updatedAt"`
 }

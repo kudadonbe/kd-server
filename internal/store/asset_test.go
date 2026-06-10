@@ -280,7 +280,7 @@ func TestQueryAssets(t *testing.T) {
 
 	// Query by office
 	filter.Office = "B15"
-	results, total, err = mongoStore.QueryAssets(ctx, filter)
+	_, total, err = mongoStore.QueryAssets(ctx, filter)
 	if err != nil {
 		t.Fatalf("QueryAssets with office filter failed: %v", err)
 	}
@@ -292,7 +292,7 @@ func TestQueryAssets(t *testing.T) {
 	// Query by category
 	filter.Office = ""
 	filter.CategoryNo = "02"
-	results, total, err = mongoStore.QueryAssets(ctx, filter)
+	_, total, err = mongoStore.QueryAssets(ctx, filter)
 	if err != nil {
 		t.Fatalf("QueryAssets with category filter failed: %v", err)
 	}

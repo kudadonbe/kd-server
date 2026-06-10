@@ -6,7 +6,7 @@ info:
     Placeholder spec. Define endpoints for ingest, resolve, lookup, and admin flows
     as roadmap parts are completed.
 servers:
-  - url: http://localhost:8080/v1
+  - url: http://localhost:18080/v1
     description: Local development
 paths:
   /healthz:
@@ -521,14 +521,14 @@ components:
     bearerAuth:
       type: http
       scheme: bearer
-      bearerFormat: JWT
+      bearerFormat: JWT or API key
       description: |
-        Bearer token signed with the server's HS256 secret. Tokens must include a `tenant` claim.
+        A TUI-issued API key for the requested tenant, or an HS256 JWT containing a matching `tenant` claim.
     tenantHeader:
       type: apiKey
       in: header
       name: X-KD-Tenant
-      description: Tenant slug that must match the token contents.
+      description: Tenant slug that must match the API key tenant or JWT tenant claim.
   schemas:
     HealthResponse:
       type: object

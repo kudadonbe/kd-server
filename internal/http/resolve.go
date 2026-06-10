@@ -14,12 +14,9 @@ type resolveRequest struct {
 }
 
 type resolveResponse struct {
-	Resolved int `json:"resolved"
-`
-	NeedsReview int `json:"needs_review"
-`
-	Skipped int `json:"skipped"
-`
+	Resolved    int `json:"resolved"`
+	NeedsReview int `json:"needs_review"`
+	Skipped     int `json:"skipped"`
 }
 
 func resolveHandler(cfg Config) http.Handler {

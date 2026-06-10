@@ -37,7 +37,9 @@ func (s *MongoStore) ListRawByStatus(ctx context.Context, tenantID, status strin
 	if err != nil {
 		return nil, fmt.Errorf("store: list raw: %w", err)
 	}
-	defer cursor.Close(ctx)
+	defer func() {
+		_ = cursor.Close(ctx)
+	}()
 
 	var records []RawRecord
 	for cursor.Next(ctx) {

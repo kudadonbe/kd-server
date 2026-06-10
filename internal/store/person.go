@@ -174,7 +174,9 @@ func (s *MongoStore) findPersonWithLinks(ctx context.Context, filter bson.M) (*P
 	if err != nil {
 		return nil, nil, fmt.Errorf("store: find links: %w", err)
 	}
-	defer cursor.Close(ctx)
+	defer func() {
+		_ = cursor.Close(ctx)
+	}()
 
 	var links []Link
 	for cursor.Next(ctx) {

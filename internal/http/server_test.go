@@ -2,6 +2,7 @@ package http_test
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -30,7 +31,9 @@ func TestHealthRoute(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 
 	res := rec.Result()
-	defer res.Body.Close()
+	defer func() {
+		_ = res.Body.Close()
+	}()
 
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("unexpected status: got %d, want %d", res.StatusCode, http.StatusOK)
@@ -42,6 +45,81 @@ func TestHealthRoute(t *testing.T) {
 
 	if body := strings.TrimSpace(readBody(t, res)); body != `{"ok":true}` {
 		t.Fatalf("unexpected body: %s", body)
+	}
+}
+
+func TestLandingAndAdminPages(t *testing.T) {
+	t.Parallel()
+
+	handler := newTestHandler(t)
+	for _, path := range []string{"/", "/admin"} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: unexpected status %d", path, rec.Code)
+		}
+		if !strings.HasPrefix(rec.Header().Get("Content-Type"), "text/html") {
+			t.Fatalf("%s: unexpected content type", path)
+		}
+	}
+}
+
+func TestAdminAPIAuthAndTenantCreation(t *testing.T) {
+	t.Parallel()
+
+	admin := &stubAdminStore{}
+	handler := newTestHandler(t, func(cfg *apphttp.Config) {
+		cfg.AdminService = services.NewAdminService(admin)
+		cfg.AdminUsername = "admin-user"
+		cfg.AdminPassword = "admin-password"
+	})
+
+	unauthorized := httptest.NewRequest(http.MethodGet, "/admin/api/tenants", nil)
+	unauthorizedRec := httptest.NewRecorder()
+	handler.ServeHTTP(unauthorizedRec, unauthorized)
+	if unauthorizedRec.Code != http.StatusUnauthorized {
+		t.Fatalf("unexpected unauthorized status: %d", unauthorizedRec.Code)
+	}
+
+	invalidLogin := httptest.NewRequest(http.MethodPost, "/admin/api/login", strings.NewReader(`{"username":"admin-user","password":"wrong"}`))
+	invalidLoginRec := httptest.NewRecorder()
+	handler.ServeHTTP(invalidLoginRec, invalidLogin)
+	if invalidLoginRec.Code != http.StatusUnauthorized {
+		t.Fatalf("unexpected invalid login status: %d", invalidLoginRec.Code)
+	}
+
+	login := httptest.NewRequest(http.MethodPost, "/admin/api/login", strings.NewReader(`{"username":"admin-user","password":"admin-password"}`))
+	loginRec := httptest.NewRecorder()
+	handler.ServeHTTP(loginRec, login)
+	if loginRec.Code != http.StatusOK {
+		t.Fatalf("unexpected login status: %d body=%s", loginRec.Code, loginRec.Body.String())
+	}
+	loginCookies := loginRec.Result().Cookies()
+	if len(loginCookies) != 1 || !loginCookies[0].HttpOnly || loginCookies[0].SameSite != http.SameSiteStrictMode {
+		t.Fatalf("unexpected admin session cookie: %#v", loginCookies)
+	}
+
+	create := httptest.NewRequest(http.MethodPost, "/admin/api/tenants", strings.NewReader(`{"slug":"fc","name":"Family Court"}`))
+	create.AddCookie(loginCookies[0])
+	createRec := httptest.NewRecorder()
+	handler.ServeHTTP(createRec, create)
+	if createRec.Code != http.StatusCreated {
+		t.Fatalf("unexpected create status: %d body=%s", createRec.Code, createRec.Body.String())
+	}
+	if admin.lastSlug != "fc" || admin.lastName != "Family Court" {
+		t.Fatalf("unexpected tenant input: %s %s", admin.lastSlug, admin.lastName)
+	}
+
+	update := httptest.NewRequest(http.MethodPost, "/admin/api/tenants/update", strings.NewReader(`{"slug":"fc","name":"Family Court Maldives"}`))
+	update.AddCookie(loginCookies[0])
+	updateRec := httptest.NewRecorder()
+	handler.ServeHTTP(updateRec, update)
+	if updateRec.Code != http.StatusOK {
+		t.Fatalf("unexpected update status: %d body=%s", updateRec.Code, updateRec.Body.String())
+	}
+	if admin.lastName != "Family Court Maldives" {
+		t.Fatalf("unexpected updated name: %s", admin.lastName)
 	}
 }
 
@@ -91,6 +169,33 @@ func TestVersionRouteAuth(t *testing.T) {
 			wantBody:   `{"error":"tenant mismatch"}`,
 		},
 		{
+			name: "invalid API key",
+			headers: map[string]string{
+				"X-KD-Tenant":   "tenant-a",
+				"Authorization": "Bearer key_unknown.invalid",
+			},
+			wantStatus: http.StatusUnauthorized,
+			wantBody:   `{"error":"invalid API key"}`,
+		},
+		{
+			name: "API key tenant mismatch",
+			headers: map[string]string{
+				"X-KD-Tenant":   "tenant-b",
+				"Authorization": "Bearer key_tenant_a.valid",
+			},
+			wantStatus: http.StatusUnauthorized,
+			wantBody:   `{"error":"invalid API key"}`,
+		},
+		{
+			name: "API key success",
+			headers: map[string]string{
+				"X-KD-Tenant":   "tenant-a",
+				"Authorization": "Bearer key_tenant_a.valid",
+			},
+			wantStatus: http.StatusOK,
+			wantBody:   `{"version":"1.0.0"}`,
+		},
+		{
 			name: "success",
 			headers: map[string]string{
 				"X-KD-Tenant":   "tenant-a",
@@ -114,7 +219,9 @@ func TestVersionRouteAuth(t *testing.T) {
 			handler.ServeHTTP(rec, req)
 
 			res := rec.Result()
-			defer res.Body.Close()
+			defer func() {
+				_ = res.Body.Close()
+			}()
 
 			if res.StatusCode != tt.wantStatus {
 				t.Fatalf("unexpected status: got %d want %d", res.StatusCode, tt.wantStatus)
@@ -167,7 +274,9 @@ func TestIngestRoute(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 
 	res := rec.Result()
-	defer res.Body.Close()
+	defer func() {
+		_ = res.Body.Close()
+	}()
 
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("unexpected status: got %d want %d", res.StatusCode, http.StatusOK)
@@ -209,7 +318,9 @@ func TestIngestRouteValidation(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 
 	res := rec.Result()
-	defer res.Body.Close()
+	defer func() {
+		_ = res.Body.Close()
+	}()
 
 	if res.StatusCode != http.StatusBadRequest {
 		t.Fatalf("unexpected status: got %d want %d", res.StatusCode, http.StatusBadRequest)
@@ -234,7 +345,9 @@ func TestResolveRoute(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 
 	res := rec.Result()
-	defer res.Body.Close()
+	defer func() {
+		_ = res.Body.Close()
+	}()
 
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("unexpected status: %d", res.StatusCode)
@@ -276,7 +389,9 @@ func TestLookupPhoneRoute(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 
 	res := rec.Result()
-	defer res.Body.Close()
+	defer func() {
+		_ = res.Body.Close()
+	}()
 
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("unexpected status: %d", res.StatusCode)
@@ -339,6 +454,11 @@ func newTestHandler(t *testing.T, overrides ...func(*apphttp.Config)) http.Handl
 		Logger:         log.New(io.Discard, "", 0),
 		VersionService: services.NewStaticVersionService("1.0.0"),
 		AuthVerifier:   verifier,
+		APIKeyVerifier: stubAPIKeyVerifier{
+			keys: map[string]string{
+				"key_tenant_a.valid": "tenant-a",
+			},
+		},
 		IngestService:  &stubIngestService{},
 		ResolveService: &stubResolver{},
 		LookupService:  &stubLookup{},
@@ -350,6 +470,46 @@ func newTestHandler(t *testing.T, overrides ...func(*apphttp.Config)) http.Handl
 	}
 
 	return apphttp.NewHandler(cfg)
+}
+
+type stubAPIKeyVerifier struct {
+	keys map[string]string
+}
+
+type stubAdminStore struct {
+	lastSlug string
+	lastName string
+}
+
+func (s *stubAdminStore) ListTenants(context.Context) ([]store.Tenant, error) {
+	return []store.Tenant{}, nil
+}
+
+func (s *stubAdminStore) CreateTenant(_ context.Context, input store.CreateTenantInput) (*store.Tenant, error) {
+	s.lastSlug = input.Slug
+	s.lastName = input.Name
+	return &store.Tenant{Slug: input.Slug, Name: input.Name, CreatedAt: time.Now()}, nil
+}
+
+func (s *stubAdminStore) UpdateTenantName(_ context.Context, slug, name string) (*store.Tenant, error) {
+	s.lastSlug = slug
+	s.lastName = name
+	return &store.Tenant{Slug: slug, Name: name, CreatedAt: time.Now()}, nil
+}
+
+func (s *stubAdminStore) IssueAPIKey(context.Context, string, string) (*store.IssuedAPIKey, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (s *stubAdminStore) RevokeAPIKey(context.Context, string, string) error {
+	return errors.New("not implemented")
+}
+
+func (s stubAPIKeyVerifier) VerifyAPIKey(_ context.Context, tenantID, apiKey string) error {
+	if s.keys[apiKey] != tenantID {
+		return errors.New("invalid API key")
+	}
+	return nil
 }
 
 func signToken(tb testing.TB, secret, tenant string, expiresAt time.Time) string {

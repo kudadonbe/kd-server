@@ -23,6 +23,9 @@ coverage.*
 # Environment & local config
 .env
 .env.*
+*.local.http
+*.local.rest
+test.rest
 /tmp/*
 
 # Logs

@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kudadonbe/kd-server/internal/config"
+	"github.com/kudadonbe/kd-server/internal/services"
 	"github.com/kudadonbe/kd-server/internal/store"
 )
 
@@ -22,6 +24,10 @@ const (
 func main() {
 	logger := log.New(os.Stdout, "", log.LstdFlags|log.LUTC)
 	reader := bufio.NewReader(os.Stdin)
+
+	if err := config.LoadDotEnv(); err != nil {
+		logger.Fatalf("configuration load failed: %v", err)
+	}
 
 	mongoURI := envOrDefault("MONGO_URI", defaultMongoURI)
 	mongoDB := envOrDefault("MONGO_DB", defaultMongoDatabase)
@@ -45,6 +51,7 @@ func main() {
 	if err := mongoStore.EnsureIndexes(ctx); err != nil {
 		logger.Fatalf("failed to ensure indexes: %v", err)
 	}
+	adminService := services.NewAdminService(mongoStore)
 
 	fmt.Println("KD-Server Admin TUI")
 	fmt.Printf("Connected to %s/%s\n\n", mongoURI, mongoDB)
@@ -53,8 +60,10 @@ func main() {
 		fmt.Println("Select an option:")
 		fmt.Println(" 1) List tenants")
 		fmt.Println(" 2) Create tenant")
-		fmt.Println(" 3) Issue API key")
-		fmt.Println(" 4) Exit")
+		fmt.Println(" 3) Edit tenant")
+		fmt.Println(" 4) Issue API key")
+		fmt.Println(" 5) Revoke API key")
+		fmt.Println(" 6) Exit")
 		fmt.Print("> ")
 
 		choice, _ := reader.ReadString('\n')
@@ -62,22 +71,30 @@ func main() {
 
 		switch choice {
 		case "1":
-			if err := listTenants(ctx, mongoStore); err != nil {
+			if err := listTenants(ctx, adminService); err != nil {
 				fmt.Printf("Error: %v\n\n", err)
 			}
 		case "2":
-			if err := createTenant(ctx, mongoStore, reader); err != nil {
+			if err := createTenant(ctx, adminService, reader); err != nil {
 				fmt.Printf("Error: %v\n\n", err)
 			}
 		case "3":
-			if err := issueKey(ctx, mongoStore, reader); err != nil {
+			if err := editTenant(ctx, adminService, reader); err != nil {
 				fmt.Printf("Error: %v\n\n", err)
 			}
 		case "4":
+			if err := issueKey(ctx, adminService, reader); err != nil {
+				fmt.Printf("Error: %v\n\n", err)
+			}
+		case "5":
+			if err := revokeKey(ctx, adminService, reader); err != nil {
+				fmt.Printf("Error: %v\n\n", err)
+			}
+		case "6":
 			fmt.Println("Goodbye!")
 			return
 		default:
-			fmt.Println("Unknown option, please choose 1-4.")
+			fmt.Println("Unknown option, please choose 1-6.")
 			fmt.Println()
 		}
 	}
@@ -91,8 +108,8 @@ func envOrDefault(key, fallback string) string {
 	return val
 }
 
-func listTenants(ctx context.Context, mongoStore *store.MongoStore) error {
-	tenants, err := mongoStore.ListTenants(ctx)
+func listTenants(ctx context.Context, adminService *services.AdminService) error {
+	tenants, err := adminService.ListTenants(ctx)
 	if err != nil {
 		return err
 	}
@@ -107,7 +124,8 @@ func listTenants(ctx context.Context, mongoStore *store.MongoStore) error {
 	fmt.Printf("%-4s %-20s %-25s %-20s\n", "#", "Slug", "Name", "Created At")
 	fmt.Println(strings.Repeat("-", 70))
 	for idx, tenant := range tenants {
-		fmt.Printf("%-4d %-20s %-25s %-20s\n",
+		fmt.Printf(
+			"%-4d %-20s %-25s %-20s\n",
 			idx+1,
 			tenant.Slug,
 			tenant.Name,
@@ -118,17 +136,14 @@ func listTenants(ctx context.Context, mongoStore *store.MongoStore) error {
 	return nil
 }
 
-func createTenant(ctx context.Context, mongoStore *store.MongoStore, reader *bufio.Reader) error {
+func createTenant(ctx context.Context, adminService *services.AdminService, reader *bufio.Reader) error {
 	fmt.Println()
 	fmt.Println("Create Tenant")
 	name := prompt(reader, "Friendly name (e.g. Acme Co)")
 	defaultSlug := slugify(name)
 	slug := promptDefault(reader, "Slug (lowercase, no spaces)", defaultSlug)
 
-	tenant, err := mongoStore.CreateTenant(ctx, store.CreateTenantInput{
-		Slug: slug,
-		Name: name,
-	})
+	tenant, err := adminService.CreateTenant(ctx, slug, name)
 	if err != nil {
 		return err
 	}
@@ -139,43 +154,48 @@ func createTenant(ctx context.Context, mongoStore *store.MongoStore, reader *buf
 	return nil
 }
 
-func issueKey(ctx context.Context, mongoStore *store.MongoStore, reader *bufio.Reader) error {
-	tenants, err := mongoStore.ListTenants(ctx)
+func editTenant(ctx context.Context, adminService *services.AdminService, reader *bufio.Reader) error {
+	tenant, err := selectTenant(ctx, adminService, reader, "Select tenant to edit:")
 	if err != nil {
 		return err
 	}
-	if len(tenants) == 0 {
-		fmt.Println()
-		fmt.Println("No tenants available. Create a tenant first.")
-		fmt.Println()
+	if tenant == nil {
 		return nil
 	}
 
-	fmt.Println()
-	fmt.Println("Select tenant for API key:")
-	for idx, tenant := range tenants {
-		fmt.Printf(" %d) %s (%s)\n", idx+1, tenant.Name, tenant.Slug)
+	fmt.Printf("Slug: %s (permanent)\n", tenant.Slug)
+	name := promptDefault(reader, "Display name", tenant.Name)
+	updated, err := adminService.UpdateTenantName(ctx, tenant.Slug, name)
+	if err != nil {
+		return err
 	}
-	fmt.Print("> ")
 
-	selectionStr, _ := reader.ReadString('\n')
-	selectionStr = strings.TrimSpace(selectionStr)
-	selection, err := strconv.Atoi(selectionStr)
-	if err != nil || selection < 1 || selection > len(tenants) {
-		return errors.New("invalid selection")
+	fmt.Println()
+	fmt.Printf("Tenant updated: %s (%s)\n", updated.Name, updated.Slug)
+	fmt.Println("Existing API keys remain valid.")
+	fmt.Println()
+	return nil
+}
+
+func issueKey(ctx context.Context, adminService *services.AdminService, reader *bufio.Reader) error {
+	tenant, err := selectTenant(ctx, adminService, reader, "Select tenant for API key:")
+	if err != nil {
+		return err
 	}
-	tenant := tenants[selection-1]
+	if tenant == nil {
+		return nil
+	}
 
 	label := promptDefault(reader, "Label (optional)", fmt.Sprintf("%s key", tenant.Name))
 
-	issued, err := mongoStore.IssueAPIKey(ctx, tenant.Slug, label)
+	issued, err := adminService.IssueAPIKey(ctx, tenant.Slug, label)
 	if err != nil {
 		return err
 	}
 
 	fmt.Println()
 	fmt.Println("API Key issued!")
-	fmt.Printf("Tenant: %s (%s)\n", issued.Tenant.Name, issued.Tenant.Slug)
+	fmt.Printf("Tenant: %s (%s)\n", tenant.Name, issued.Tenant)
 	fmt.Printf("Key ID: %s\n", issued.KeyID)
 	fmt.Printf("Label: %s\n", issued.Label)
 	fmt.Println()
@@ -184,10 +204,57 @@ func issueKey(ctx context.Context, mongoStore *store.MongoStore, reader *bufio.R
 
 	fmt.Println()
 	fmt.Println(".env snippet:")
-	fmt.Printf("KD_TENANT=%s\n", issued.Tenant.Slug)
+	fmt.Printf("KD_TENANT=%s\n", issued.Tenant)
 	fmt.Printf("KD_API_KEY=%s\n", issued.Secret)
 	fmt.Println()
 	return nil
+}
+
+func revokeKey(ctx context.Context, adminService *services.AdminService, reader *bufio.Reader) error {
+	tenant, err := selectTenant(ctx, adminService, reader, "Select tenant for API key revocation:")
+	if err != nil {
+		return err
+	}
+	if tenant == nil {
+		return nil
+	}
+
+	keyID := prompt(reader, "Key ID (for example key_abc123)")
+	if err := adminService.RevokeAPIKey(ctx, tenant.Slug, keyID); err != nil {
+		return err
+	}
+
+	fmt.Println()
+	fmt.Printf("API key %s revoked.\n\n", keyID)
+	return nil
+}
+
+func selectTenant(ctx context.Context, adminService *services.AdminService, reader *bufio.Reader, heading string) (*services.TenantSummary, error) {
+	tenants, err := adminService.ListTenants(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(tenants) == 0 {
+		fmt.Println()
+		fmt.Println("No tenants available. Create a tenant first.")
+		fmt.Println()
+		return nil, nil
+	}
+
+	fmt.Println()
+	fmt.Println(heading)
+	for idx, tenant := range tenants {
+		fmt.Printf(" %d) %s (%s)\n", idx+1, tenant.Name, tenant.Slug)
+	}
+	fmt.Print("> ")
+
+	selectionStr, _ := reader.ReadString('\n')
+	selection, err := strconv.Atoi(strings.TrimSpace(selectionStr))
+	if err != nil || selection < 1 || selection > len(tenants) {
+		return nil, errors.New("invalid selection")
+	}
+
+	return &tenants[selection-1], nil
 }
 
 func prompt(reader *bufio.Reader, label string) string {
