@@ -175,6 +175,30 @@ func defaultIndexSpecs() map[string][]mongo.IndexModel {
 				Options: options.Index().SetName("raw_status"),
 			},
 		},
+		"identity_documents": {
+			{
+				Keys:    bson.D{{Key: "tenantId", Value: 1}, {Key: "documentId", Value: 1}},
+				Options: options.Index().SetName("identity_documents_tenant_document").SetUnique(true),
+			},
+			{
+				Keys:    bson.D{{Key: "tenantId", Value: 1}, {Key: "personId", Value: 1}, {Key: "updatedAt", Value: -1}},
+				Options: options.Index().SetName("identity_documents_tenant_person"),
+			},
+			{
+				Keys:    bson.D{{Key: "tenantId", Value: 1}, {Key: "nationalId", Value: 1}},
+				Options: options.Index().SetName("identity_documents_tenant_national_id"),
+			},
+		},
+		"identity_document_history": {
+			{
+				Keys:    bson.D{{Key: "tenantId", Value: 1}, {Key: "documentId", Value: 1}, {Key: "version", Value: -1}},
+				Options: options.Index().SetName("identity_document_history_version").SetUnique(true),
+			},
+			{
+				Keys:    bson.D{{Key: "tenantId", Value: 1}, {Key: "personId", Value: 1}, {Key: "createdAt", Value: -1}},
+				Options: options.Index().SetName("identity_document_history_person"),
+			},
+		},
 		"tenants": {
 			{
 				Keys:    bson.D{{Key: "slug", Value: 1}},

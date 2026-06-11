@@ -27,6 +27,8 @@ type Config struct {
 	AssetService          *services.AssetService
 	ClassificationService *services.ClassificationService
 	AdminService          *services.AdminService
+	IdentityDocuments     services.IdentityDocuments
+	DocumentExtractor     services.DocumentExtractor
 	AdminUsername         string
 	AdminPassword         string
 }

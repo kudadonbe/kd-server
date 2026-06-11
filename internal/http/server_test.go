@@ -1,10 +1,12 @@
 package http_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -120,6 +122,117 @@ func TestAdminAPIAuthAndTenantCreation(t *testing.T) {
 	}
 	if admin.lastName != "Family Court Maldives" {
 		t.Fatalf("unexpected updated name: %s", admin.lastName)
+	}
+}
+
+func TestAdminIdentityDocumentAPI(t *testing.T) {
+	t.Parallel()
+
+	documents := &stubIdentityDocuments{}
+	handler := newTestHandler(t, func(cfg *apphttp.Config) {
+		cfg.AdminService = services.NewAdminService(&stubAdminStore{})
+		cfg.IdentityDocuments = documents
+		cfg.AdminUsername = "admin-user"
+		cfg.AdminPassword = "admin-password"
+	})
+
+	login := httptest.NewRequest(http.MethodPost, "/admin/api/login", strings.NewReader(`{"username":"admin-user","password":"admin-password"}`))
+	loginRec := httptest.NewRecorder()
+	handler.ServeHTTP(loginRec, login)
+	if loginRec.Code != http.StatusOK {
+		t.Fatalf("unexpected login status: %d", loginRec.Code)
+	}
+	cookie := loginRec.Result().Cookies()[0]
+
+	save := httptest.NewRequest(http.MethodPost, "/admin/api/identity-documents", strings.NewReader(`{
+		"tenant_id":"fc",
+		"person_id":"person-1",
+		"national_id":"A000001",
+		"name":{"english":"Sample Person","dhivehi":""},
+		"common_name":{"english":"Sample","dhivehi":""},
+		"address":{"house":{"english":"Example House","dhivehi":""},"island":{"english":"K. Male","dhivehi":""}},
+		"source":"manual-admin",
+		"extraction_method":"manual",
+		"verification_status":"unverified",
+		"signature_present":false,
+		"fingerprint_present":false
+	}`))
+	save.AddCookie(cookie)
+	saveRec := httptest.NewRecorder()
+	handler.ServeHTTP(saveRec, save)
+	if saveRec.Code != http.StatusOK {
+		t.Fatalf("unexpected save status: %d body=%s", saveRec.Code, saveRec.Body.String())
+	}
+	if documents.lastSaved.TenantID != "fc" || documents.lastSaved.PersonID != "person-1" {
+		t.Fatalf("unexpected saved document scope: %#v", documents.lastSaved)
+	}
+	if documents.lastActor != "admin-user" {
+		t.Fatalf("unexpected document actor: %s", documents.lastActor)
+	}
+
+	list := httptest.NewRequest(http.MethodGet, "/admin/api/identity-documents?tenant=fc&person_id=person-1", nil)
+	list.AddCookie(cookie)
+	listRec := httptest.NewRecorder()
+	handler.ServeHTTP(listRec, list)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("unexpected list status: %d body=%s", listRec.Code, listRec.Body.String())
+	}
+	if documents.lastTenant != "fc" || documents.lastPerson != "person-1" {
+		t.Fatalf("unexpected list filters: tenant=%s person=%s", documents.lastTenant, documents.lastPerson)
+	}
+}
+
+func TestAdminIdentityDocumentExtraction(t *testing.T) {
+	t.Parallel()
+
+	extractor := &stubDocumentExtractor{
+		result: &services.DocumentExtraction{
+			Engine:         "test-ocr",
+			PagesProcessed: 1,
+			NationalID:     "A123456",
+			NameEnglish:    "Sample Person",
+			RawText:        "Number A123456 Name Sample Person",
+		},
+	}
+	handler := newTestHandler(t, func(cfg *apphttp.Config) {
+		cfg.AdminService = services.NewAdminService(&stubAdminStore{})
+		cfg.DocumentExtractor = extractor
+		cfg.AdminUsername = "admin-user"
+		cfg.AdminPassword = "admin-password"
+	})
+
+	login := httptest.NewRequest(http.MethodPost, "/admin/api/login", strings.NewReader(`{"username":"admin-user","password":"admin-password"}`))
+	loginRec := httptest.NewRecorder()
+	handler.ServeHTTP(loginRec, login)
+	cookie := loginRec.Result().Cookies()[0]
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("document", "sample.jpg")
+	if err != nil {
+		t.Fatalf("create multipart file: %v", err)
+	}
+	if _, err := part.Write([]byte{0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 'J', 'F', 'I', 'F', 0x00}); err != nil {
+		t.Fatalf("write multipart file: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart writer: %v", err)
+	}
+
+	request := httptest.NewRequest(http.MethodPost, "/admin/api/identity-documents/extract", &body)
+	request.Header.Set("Content-Type", writer.FormDataContentType())
+	request.AddCookie(cookie)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("unexpected extraction status: %d body=%s", recorder.Code, recorder.Body.String())
+	}
+	if extractor.filename != "sample.jpg" || extractor.contentType != "image/jpeg" {
+		t.Fatalf("unexpected extraction input: %s %s", extractor.filename, extractor.contentType)
+	}
+	if !strings.Contains(recorder.Body.String(), `"national_id":"A123456"`) {
+		t.Fatalf("unexpected extraction response: %s", recorder.Body.String())
 	}
 }
 
@@ -474,6 +587,44 @@ func newTestHandler(t *testing.T, overrides ...func(*apphttp.Config)) http.Handl
 
 type stubAPIKeyVerifier struct {
 	keys map[string]string
+}
+
+type stubIdentityDocuments struct {
+	lastSaved  store.IdentityDocument
+	lastActor  string
+	lastTenant string
+	lastPerson string
+}
+
+type stubDocumentExtractor struct {
+	result      *services.DocumentExtraction
+	err         error
+	filename    string
+	contentType string
+}
+
+func (s *stubDocumentExtractor) Extract(_ context.Context, filename, contentType string, source io.Reader) (*services.DocumentExtraction, error) {
+	s.filename = filename
+	s.contentType = contentType
+	_, _ = io.ReadAll(source)
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.result, nil
+}
+
+func (s *stubIdentityDocuments) List(_ context.Context, tenantID, personID string, _ int) ([]store.IdentityDocument, error) {
+	s.lastTenant = tenantID
+	s.lastPerson = personID
+	return []store.IdentityDocument{s.lastSaved}, nil
+}
+
+func (s *stubIdentityDocuments) Save(_ context.Context, document store.IdentityDocument, actor string) (*store.IdentityDocument, error) {
+	document.DocumentID = "doc_test"
+	document.Version = 1
+	s.lastSaved = document
+	s.lastActor = actor
+	return &document, nil
 }
 
 type stubAdminStore struct {

@@ -90,6 +90,11 @@ func main() {
 	reviewService := services.NewReviewService(mongoStore)
 	assetService := services.NewAssetService(mongoStore)
 	adminService := services.NewAdminService(mongoStore)
+	identityDocumentService := services.NewIdentityDocumentService(mongoStore)
+	documentExtractor, err := services.NewLocalDocumentExtractor()
+	if err != nil {
+		logger.Printf("warning: document extraction disabled: %v", err)
+	}
 
 	classificationService, err := services.NewClassificationService()
 	if err != nil {
@@ -110,6 +115,8 @@ func main() {
 		AssetService:          assetService,
 		ClassificationService: classificationService,
 		AdminService:          adminService,
+		IdentityDocuments:     identityDocumentService,
+		DocumentExtractor:     documentExtractor,
 		AdminUsername:         os.Getenv("KD_ADMIN_USERNAME"),
 		AdminPassword:         os.Getenv("KD_ADMIN_PASSWORD"),
 	})

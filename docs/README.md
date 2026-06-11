@@ -7,6 +7,7 @@
 
 ## Client Integration
 - **CLIENT_INTEGRATION_GUIDE.md** - Guide for integrating client apps with KD-Server API
+- **IDENTITY_DOCUMENTS.md** - Maldivian identity-document fields, tracing, and security rules
 - **CLIENT_UI_BUILD_GUIDE.md** - UI building guidelines
 
 ## Development Notes

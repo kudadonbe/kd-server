@@ -53,6 +53,32 @@ func TestDefaultIndexSpecs(t *testing.T) {
 				keys: bson.D{{Key: "tenantId", Value: 1}, {Key: "status", Value: 1}},
 			},
 		},
+		"identity_documents": {
+			{
+				name:   "identity_documents_tenant_document",
+				keys:   bson.D{{Key: "tenantId", Value: 1}, {Key: "documentId", Value: 1}},
+				unique: true,
+			},
+			{
+				name: "identity_documents_tenant_person",
+				keys: bson.D{{Key: "tenantId", Value: 1}, {Key: "personId", Value: 1}, {Key: "updatedAt", Value: -1}},
+			},
+			{
+				name: "identity_documents_tenant_national_id",
+				keys: bson.D{{Key: "tenantId", Value: 1}, {Key: "nationalId", Value: 1}},
+			},
+		},
+		"identity_document_history": {
+			{
+				name:   "identity_document_history_version",
+				keys:   bson.D{{Key: "tenantId", Value: 1}, {Key: "documentId", Value: 1}, {Key: "version", Value: -1}},
+				unique: true,
+			},
+			{
+				name: "identity_document_history_person",
+				keys: bson.D{{Key: "tenantId", Value: 1}, {Key: "personId", Value: 1}, {Key: "createdAt", Value: -1}},
+			},
+		},
 		"tenants": {
 			{
 				name:   "tenants_slug",
