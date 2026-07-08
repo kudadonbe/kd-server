@@ -48,6 +48,21 @@ func (s *Service) DefaultStatus(ctx context.Context) (DefaultStatus, error) {
 	return status, nil
 }
 
+// ValidateDefault resolves the server default credential (admin-stored or the
+// ANTHROPIC_API_KEY env fallback) and confirms it works with a live provider
+// call. It returns the validated model. Useful for testing without storing
+// anything (works even when encryption is off).
+func (s *Service) ValidateDefault(ctx context.Context) (string, error) {
+	cred, err := s.ResolveCredential(ctx, "")
+	if err != nil {
+		return "", err
+	}
+	if err := s.provider.Validate(ctx, cred); err != nil {
+		return "", err
+	}
+	return cred.Model, nil
+}
+
 // SetDefault validates and stores the admin-managed default credential.
 func (s *Service) SetDefault(ctx context.Context, apiKey, model string) (CredentialMeta, error) {
 	return s.ValidateAndStore(ctx, globalScope, apiKey, model)

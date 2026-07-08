@@ -209,6 +209,21 @@ func adminAPIHandler(cfg Config, adminAuth *adminAuthenticator) http.Handler {
 				return
 			}
 			writeJSON(w, http.StatusOK, map[string]bool{"removed": true})
+		case r.URL.Path == "/admin/api/ai-validate" && r.Method == http.MethodPost && cfg.AIService != nil:
+			model, err := cfg.AIService.ValidateDefault(r.Context())
+			if err != nil {
+				switch {
+				case errors.Is(err, ai.ErrNotConfigured):
+					writeJSON(w, http.StatusBadRequest, map[string]string{"error": "no default key configured (set ANTHROPIC_API_KEY or pair one)"})
+				case errors.Is(err, ai.ErrInvalidKey):
+					writeJSON(w, http.StatusBadRequest, map[string]string{"error": "api key rejected by provider"})
+				default:
+					writeJSON(w, http.StatusBadGateway, map[string]string{"error": "could not reach the provider"})
+				}
+				return
+			}
+			w.Header().Set("Cache-Control", "no-store")
+			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "provider": cfg.AIService.ProviderName(), "model": model})
 		default:
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "not found"})
 		}

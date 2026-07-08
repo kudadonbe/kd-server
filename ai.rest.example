@@ -1,43 +1,96 @@
-# Shared AI credential management — manual API tests (REST Client / JetBrains HTTP).
+# ============================================================================
+# kd-server — AI test file (VS Code REST Client / JetBrains HTTP Client)
+# ============================================================================
 #
-# 1. Copy this file to ai.rest (gitignored — keeps your real key out of git).
-# 2. Generate an encryption key and set it before starting the API:
-#      AI_ENCRYPTION_KEY=$(openssl rand -base64 32)
-#    (in .env, or the process environment). Then: go run ./cmd/api
-# 3. Create a tenant + tenant key via the admin console / TUI, fill in @tenantKey.
-# 4. Paste your real Anthropic key into the POST body and Send Request.
+# SETUP
+#   1. In .env set your key (this alone enables AI — no encryption key needed):
+#        ANTHROPIC_API_KEY=sk-ant-...
+#        # AI_DEFAULT_MODEL=claude-opus-4-8   # optional, if your key can't reach sonnet-5
+#   2. Start the server:  go run ./cmd/api
+#      The startup banner must show:  AI: enabled (anthropic) — server default key set
+#      If it says "not configured", ANTHROPIC_API_KEY isn't set / not loaded.
+#   3. Copy this file to ai.rest (gitignored) and set the admin values below.
+#   4. Run the requests in Section 1 top-to-bottom (the login cookie is reused).
+# ============================================================================
 
 @baseUrl = http://localhost:18080
-@tenant = pem
-# A TUI-issued tenant API key (key_...) or an HS256 JWT with a matching tenant claim.
-@tenantKey = key_yourKeyId.yourSecret
 
-### Store a bring-your-own Anthropic key — validated, then stored encrypted.
-# Response is masked metadata only (never echoes the key).
+# Admin credentials — must match KD_ADMIN_USERNAME / KD_ADMIN_PASSWORD in .env
+@adminUser = admin
+@adminPass = generate-a-strong-random-password
+
+
+# ============================================================================
+# SECTION 1 — Test the env key (no encryption key needed). RUN IN ORDER.
+# ============================================================================
+
+### 1a. Admin login — stores the session cookie for the requests below.
+# Expect: 200 {"status":"authenticated"}
+POST {{baseUrl}}/admin/api/login
+Content-Type: application/json
+
+{ "username": "{{adminUser}}", "password": "{{adminPass}}" }
+
+### 1b. Is AI active, and where does the key come from?
+# Expect: 200 {"configured":true,"paired":true,"source":"env","key_hint":"...XXXX",...}
+#   "source":"env" = using your ANTHROPIC_API_KEY.
+#   404 = AI not active (ANTHROPIC_API_KEY not set / wrong branch).
+GET {{baseUrl}}/admin/api/ai-status
+
+### 1c. Live check — actually calls Anthropic with the current key.
+# Expect: 200 {"ok":true,"provider":"anthropic","model":"claude-sonnet-5"}
+#   400 "api key rejected by provider" = bad key, or the model isn't on your plan
+#        (set AI_DEFAULT_MODEL to one you have, e.g. claude-haiku-4-5, and restart).
+#   400 "no default key configured" = ANTHROPIC_API_KEY not set.
+#   502 = couldn't reach Anthropic (network).
+POST {{baseUrl}}/admin/api/ai-validate
+
+# If 1c is 200, AI is working — upload an ID card in the /admin extract box and
+# the response "engine" will be "anthropic:<model>" instead of "tesseract-5".
+
+
+# ============================================================================
+# SECTION 2 — Store keys in the DB (only if AI_ENCRYPTION_KEY is set)
+# ============================================================================
+# These persist an encrypted key. They require AI_ENCRYPTION_KEY in .env; without
+# it they return 400 "set AI_ENCRYPTION_KEY". Not needed for the env-key flow above.
+
+# Fill these for the tenant flow:
+@tenant = pem
+@tenantKey = key_yourKeyId.yourSecret
+@anthropicKey = sk-ant-REPLACE_WITH_YOUR_KEY
+
+### 2a. Admin: pair a server-default key (encrypted). Powers extraction like the env key.
+POST {{baseUrl}}/admin/api/ai-credentials
+Content-Type: application/json
+
+{ "api_key": "{{anthropicKey}}", "model": "claude-sonnet-5" }
+
+### 2b. Admin: unpair the stored default key.
+DELETE {{baseUrl}}/admin/api/ai-credentials
+
+### 2c. Tenant: store a per-tenant key (Bearer auth).
 POST {{baseUrl}}/v1/ai/credentials
 Authorization: Bearer {{tenantKey}}
 X-KD-Tenant: {{tenant}}
 Content-Type: application/json
 
-{
-  "api_key": "sk-ant-REPLACE_WITH_YOUR_KEY",
-  "model": "claude-sonnet-5"
-}
+{ "api_key": "{{anthropicKey}}", "model": "claude-sonnet-5" }
 
-### List stored credentials (masked)
+### 2d. Tenant: list stored keys (masked).
 GET {{baseUrl}}/v1/ai/credentials
 Authorization: Bearer {{tenantKey}}
 X-KD-Tenant: {{tenant}}
 
-### Delete the Anthropic credential
+### 2e. Tenant: delete the stored key.
 DELETE {{baseUrl}}/v1/ai/credentials/anthropic
 Authorization: Bearer {{tenantKey}}
 X-KD-Tenant: {{tenant}}
 
-### Reject a bad key — expect 400
-POST {{baseUrl}}/v1/ai/credentials
-Authorization: Bearer {{tenantKey}}
-X-KD-Tenant: {{tenant}}
-Content-Type: application/json
 
-{ "api_key": "not-a-real-key" }
+# ============================================================================
+# SECTION 3 — Sanity
+# ============================================================================
+
+### Public health check — no auth. Expect: 200 {"ok":true}
+GET {{baseUrl}}/v1/healthz

@@ -209,7 +209,7 @@ func enabledLabel(enabled bool) string {
 // document-extraction flow relies on).
 func aiStatusLabel(svc *ai.Service) string {
 	if svc == nil {
-		return "not configured (set AI_ENCRYPTION_KEY to enable)"
+		return "not configured (set ANTHROPIC_API_KEY in .env to enable)"
 	}
 	label := "enabled (" + svc.ProviderName() + ")"
 	if os.Getenv("ANTHROPIC_API_KEY") == "" {
