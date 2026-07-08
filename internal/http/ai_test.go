@@ -12,6 +12,7 @@ import (
 
 	"github.com/kudadonbe/kd-server/internal/ai"
 	apphttp "github.com/kudadonbe/kd-server/internal/http"
+	"github.com/kudadonbe/kd-server/internal/services"
 	"github.com/kudadonbe/kd-server/internal/store"
 )
 
@@ -152,6 +153,61 @@ func TestAICredentialsRejectsBadKey(t *testing.T) {
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400 for rejected key, got %d", rec.Code)
+	}
+}
+
+func TestAdminAIDefaultCredential(t *testing.T) {
+	t.Parallel()
+
+	handler := newTestHandler(t, func(cfg *apphttp.Config) {
+		cfg.AdminService = services.NewAdminService(&stubAdminStore{})
+		cfg.AIService = testAIService(t, nil)
+		cfg.AdminUsername = "admin-user"
+		cfg.AdminPassword = "admin-password"
+	})
+
+	login := httptest.NewRequest(http.MethodPost, "/admin/api/login", strings.NewReader(`{"username":"admin-user","password":"admin-password"}`))
+	loginRec := httptest.NewRecorder()
+	handler.ServeHTTP(loginRec, login)
+	if loginRec.Code != http.StatusOK {
+		t.Fatalf("login status %d", loginRec.Code)
+	}
+	cookie := loginRec.Result().Cookies()[0]
+
+	do := func(method, path, body string) *httptest.ResponseRecorder {
+		var reader io.Reader
+		if body != "" {
+			reader = strings.NewReader(body)
+		}
+		req := httptest.NewRequest(method, path, reader)
+		req.AddCookie(cookie)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		return rec
+	}
+
+	if st := do(http.MethodGet, "/admin/api/ai-status", ""); st.Code != http.StatusOK || !strings.Contains(st.Body.String(), `"paired":false`) {
+		t.Fatalf("initial status: %d %s", st.Code, st.Body.String())
+	}
+
+	pair := do(http.MethodPost, "/admin/api/ai-credentials", `{"api_key":"sk-ant-adminkey-4321","model":"claude-sonnet-5"}`)
+	if pair.Code != http.StatusOK {
+		t.Fatalf("pair status %d body=%s", pair.Code, pair.Body.String())
+	}
+	if strings.Contains(pair.Body.String(), "sk-ant-adminkey-4321") {
+		t.Fatalf("pair response leaks key: %s", pair.Body.String())
+	}
+
+	st := do(http.MethodGet, "/admin/api/ai-status", "")
+	if !strings.Contains(st.Body.String(), `"paired":true`) || !strings.Contains(st.Body.String(), `"...4321"`) || !strings.Contains(st.Body.String(), `"source":"stored"`) {
+		t.Fatalf("expected paired/stored: %s", st.Body.String())
+	}
+
+	if del := do(http.MethodDelete, "/admin/api/ai-credentials", ""); del.Code != http.StatusOK {
+		t.Fatalf("unpair status %d", del.Code)
+	}
+	if st := do(http.MethodGet, "/admin/api/ai-status", ""); !strings.Contains(st.Body.String(), `"paired":false`) {
+		t.Fatalf("expected unpaired after delete: %s", st.Body.String())
 	}
 }
 

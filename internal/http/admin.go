@@ -3,12 +3,14 @@ package http
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"path/filepath"
 	"strconv"
 	"strings"
 
+	"github.com/kudadonbe/kd-server/internal/ai"
 	"github.com/kudadonbe/kd-server/internal/store"
 )
 
@@ -166,6 +168,44 @@ func adminAPIHandler(cfg Config, adminAuth *adminAuthenticator) http.Handler {
 			}
 			w.Header().Set("Cache-Control", "no-store")
 			writeJSON(w, http.StatusOK, extraction)
+		case r.URL.Path == "/admin/api/ai-status" && r.Method == http.MethodGet && cfg.AIService != nil:
+			status, err := cfg.AIService.DefaultStatus(r.Context())
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "ai status failed"})
+				return
+			}
+			w.Header().Set("Cache-Control", "no-store")
+			writeJSON(w, http.StatusOK, status)
+		case r.URL.Path == "/admin/api/ai-credentials" && r.Method == http.MethodPost && cfg.AIService != nil:
+			var req struct {
+				APIKey string `json:"api_key"`
+				Model  string `json:"model"`
+			}
+			if err := decodeAdminJSON(r, &req); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid payload"})
+				return
+			}
+			if strings.TrimSpace(req.APIKey) == "" {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "api_key is required"})
+				return
+			}
+			meta, err := cfg.AIService.SetDefault(r.Context(), req.APIKey, req.Model)
+			if err != nil {
+				if errors.Is(err, ai.ErrInvalidKey) {
+					writeJSON(w, http.StatusBadRequest, map[string]string{"error": "api key rejected by provider"})
+					return
+				}
+				writeJSON(w, http.StatusBadGateway, map[string]string{"error": "could not validate api key"})
+				return
+			}
+			w.Header().Set("Cache-Control", "no-store")
+			writeJSON(w, http.StatusOK, meta)
+		case r.URL.Path == "/admin/api/ai-credentials" && r.Method == http.MethodDelete && cfg.AIService != nil:
+			if err := cfg.AIService.DeleteDefault(r.Context()); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "delete failed"})
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]bool{"removed": true})
 		default:
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "not found"})
 		}
@@ -264,6 +304,7 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px;bor
 <section class="card"><h2>Edit tenant</h2><label>Select tenant</label><select id="editTenant" onchange="selectTenantForEdit()"></select><div class="muted">The slug shown in parentheses is permanent because it identifies tenant data and credentials.</div><label>Display name</label><input id="editTenantName" placeholder="Updated tenant name"><button onclick="updateTenant()">Save changes</button></section>
 <section class="card"><h2>Issue API key</h2><label>Tenant</label><select id="issueTenant"></select><label>Label</label><input id="keyLabel" placeholder="FC production"><button onclick="issueKey()">Issue key</button><div id="secret"></div></section>
 <section class="card"><h2>Revoke API key</h2><label>Tenant</label><select id="revokeTenant"></select><label>Key ID</label><input id="keyId" placeholder="key_..."><button class="danger" onclick="revokeKey()">Revoke key</button></section>
+<section class="card"><h2>AI provider</h2><div id="aiStatus" class="muted">Checking AI status&hellip;</div><label>Anthropic API key</label><input id="aiApiKey" type="password" autocomplete="off" placeholder="sk-ant-..."><label>Model (optional)</label><input id="aiModel" placeholder="claude-sonnet-5"><button onclick="saveAIKey()">Pair AI</button><button type="button" class="danger" style="margin-left:8px" onclick="removeAIKey()">Unpair</button><div class="muted" style="margin-top:10px">The key is validated, stored encrypted, and never shown again. It backs document extraction and other AI features server-wide.</div></section>
 <section class="card"><h2>Tenants</h2><table><thead><tr><th>Slug</th><th>Name</th><th>Created</th></tr></thead><tbody id="tenants"></tbody></table></section>
 <section class="card wide"><h2>Maldivian identity document</h2><p class="muted">Structured document tracing linked to a person. Image fields store secured references only.</p>
 <div class="identity-layout"><div>
@@ -315,7 +356,7 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px;bor
 </main><script>
 function show(text,error=false){const el=document.getElementById('message');el.textContent=text;el.className=error?'err':'ok'}
 async function request(path,options={}){const res=await fetch(path,{...options,headers:{'Content-Type':'application/json',...(options.headers||{})}});const data=await res.json();if(!res.ok)throw new Error(data.error||'Request failed');return data}
-async function login(){try{await request('/admin/api/login',{method:'POST',body:JSON.stringify({username:value('username'),password:value('password')})});document.getElementById('password').value='';await loadTenants();await loadIdentityDocuments();setAuthenticated(true);show('Signed in.')}catch(e){show(e.message,true)}}
+async function login(){try{await request('/admin/api/login',{method:'POST',body:JSON.stringify({username:value('username'),password:value('password')})});document.getElementById('password').value='';await loadTenants();await loadIdentityDocuments();await loadAIStatus();setAuthenticated(true);show('Signed in.')}catch(e){show(e.message,true)}}
 async function logout(){await request('/admin/api/logout',{method:'POST'});setAuthenticated(false);show('Signed out.')}
 function setAuthenticated(authenticated){document.getElementById('loginCard').classList.toggle('hidden',authenticated);document.getElementById('adminDashboard').classList.toggle('hidden',!authenticated);document.getElementById('logoutButton').classList.toggle('hidden',!authenticated)}
 let tenants=[];let identityDocuments=[];async function loadTenants(){const data=await request('/admin/api/tenants');tenants=data.tenants;const rows=document.getElementById('tenants');rows.innerHTML='';for(const t of tenants){rows.insertAdjacentHTML('beforeend','<tr><td>'+escapeHTML(t.slug)+'</td><td>'+escapeHTML(t.name)+'</td><td>'+new Date(t.created_at).toLocaleDateString()+'</td></tr>')}for(const id of ['editTenant','issueTenant','revokeTenant','documentTenant']){const s=document.getElementById(id);s.innerHTML=tenants.map(t=>'<option value="'+escapeHTML(t.slug)+'">'+escapeHTML(t.name)+' ('+escapeHTML(t.slug)+')</option>').join('')}selectTenantForEdit()}
@@ -324,6 +365,9 @@ function selectTenantForEdit(){const tenant=tenants.find(t=>t.slug===value('edit
 async function updateTenant(){try{await request('/admin/api/tenants/update',{method:'POST',body:JSON.stringify({slug:value('editTenant'),name:value('editTenantName')})});await loadTenants();show('Tenant details updated. Existing API keys remain valid.')}catch(e){show(e.message,true)}}
 async function issueKey(){try{const data=await request('/admin/api/keys',{method:'POST',body:JSON.stringify({tenant:value('issueTenant'),label:value('keyLabel')})});const el=document.getElementById('secret');el.className='ok';el.textContent='Save this secret now. It will not be shown again:\n\n'+data.secret+'\n\nKey ID: '+data.key_id}catch(e){show(e.message,true)}}
 async function revokeKey(){if(!confirm('Revoke this API key? Existing clients using it will stop working.'))return;try{await request('/admin/api/keys/revoke',{method:'POST',body:JSON.stringify({tenant:value('revokeTenant'),key_id:value('keyId')})});show('API key revoked.')}catch(e){show(e.message,true)}}
+async function loadAIStatus(){const box=document.getElementById('aiStatus');try{const s=await request('/admin/api/ai-status');if(s.paired){box.className='ok';box.textContent='AI paired ✓  '+s.provider+' · '+(s.model||'default model')+' · key '+(s.key_hint||'')+' · source: '+s.source}else{box.className='muted';box.textContent='AI enabled but not paired — enter a key below to connect.'}}catch(e){box.className='muted';box.textContent='AI is not enabled on this server (set AI_ENCRYPTION_KEY).'}}
+async function saveAIKey(){try{const s=await request('/admin/api/ai-credentials',{method:'POST',body:JSON.stringify({api_key:value('aiApiKey'),model:value('aiModel')})});document.getElementById('aiApiKey').value='';show('AI paired ('+(s.key_hint||'')+').');await loadAIStatus()}catch(e){show(e.message,true)}}
+async function removeAIKey(){if(!confirm('Unpair AI? Document extraction will fall back to OCR.'))return;try{await request('/admin/api/ai-credentials',{method:'DELETE'});show('AI unpaired.');await loadAIStatus()}catch(e){show(e.message,true)}}
 function identityPayload(){return{document_id:value('documentId'),tenant_id:value('documentTenant'),person_id:value('personId'),national_id:value('nationalId'),serial_number:value('serialNumber'),name:{english:value('nameEnglish'),dhivehi:value('nameDhivehi')},common_name:{english:value('commonNameEnglish'),dhivehi:value('commonNameDhivehi')},sex:value('identitySex'),date_of_birth:value('dateOfBirth'),address:{house:{english:value('houseEnglish'),dhivehi:value('houseDhivehi')},island:{english:value('islandEnglish'),dhivehi:value('islandDhivehi')}},blood_group:value('bloodGroup'),expiry_date:value('expiryDate'),signature_present:checked('signaturePresent'),fingerprint_present:checked('fingerprintPresent'),source:value('identitySource'),extraction_method:value('extractionMethod'),verification_status:value('verificationStatus'),verified_by:value('verifiedBy'),front_image_ref:value('frontImageRef'),back_image_ref:value('backImageRef')}}
 async function extractIdentityDocument(){const input=document.getElementById('identityDocumentFile');if(!input.files.length){show('Choose a PDF, JPG, or PNG document first.',true);return}const status=document.getElementById('extractStatus');status.textContent='Extracting locally...';const body=new FormData();body.append('document',input.files[0]);try{const res=await fetch('/admin/api/identity-documents/extract',{method:'POST',body});const data=await res.json();if(!res.ok)throw new Error(data.error||'Extraction failed');applyExtraction(data);status.textContent='Processed '+data.pages_processed+' page(s) with '+data.engine+'. Review every field before saving.';show((data.warnings||[]).join('\n')||'Document fields extracted for review.')}catch(e){status.textContent='';show(e.message,true)}}
 function applyExtraction(data){setIfPresent('nationalId',data.national_id);setIfPresent('nameEnglish',data.name_english);setIfPresent('nameDhivehi',data.name_dhivehi);setIfPresent('commonNameEnglish',data.common_name_english);setIfPresent('identitySex',data.sex);setIfPresent('dateOfBirth',data.date_of_birth);setIfPresent('houseEnglish',data.house_english);setIfPresent('houseDhivehi',data.house_dhivehi);setIfPresent('islandEnglish',data.island_english);setIfPresent('islandDhivehi',data.island_dhivehi);setIfPresent('bloodGroup',data.blood_group);setIfPresent('expiryDate',data.expiry_date);setIfPresent('serialNumber',data.serial_number);setValue('identitySource','document-upload');setValue('extractionMethod','ocr');setValue('verificationStatus','unverified');document.getElementById('rawOCRText').value=data.raw_text||'';const confidence=document.getElementById('ocrConfidence');confidence.innerHTML='';for(const [field,score] of Object.entries(data.field_confidence||{}))confidence.insertAdjacentHTML('beforeend','<span>'+escapeHTML(field)+': '+Math.round(score*100)+'%</span>');document.getElementById('ocrReview').classList.remove('hidden');updateIdentityPreview()}
@@ -336,5 +380,5 @@ function displayDate(v){if(!v)return '-';const p=v.split('-');return p.length===
 for(const el of document.querySelectorAll('#adminDashboard input,#adminDashboard select'))el.addEventListener('input',updateIdentityPreview)
 function checked(id){return document.getElementById(id).checked}function setValue(id,v){document.getElementById(id).value=v||''}function setIfPresent(id,v){if(v)setValue(id,v)}function text(id,v){document.getElementById(id).textContent=v}
 function value(id){return document.getElementById(id).value.trim()}function escapeHTML(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-loadTenants().then(()=>loadIdentityDocuments()).then(()=>setAuthenticated(true)).catch(()=>setAuthenticated(false));updateIdentityPreview();
+loadTenants().then(()=>loadIdentityDocuments()).then(()=>loadAIStatus()).then(()=>setAuthenticated(true)).catch(()=>setAuthenticated(false));updateIdentityPreview();
 </script></body></html>`

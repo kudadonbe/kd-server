@@ -159,6 +159,7 @@ func main() {
 	logger.Printf("Health:    %s/v1/healthz", baseURL)
 	logger.Printf("MongoDB:   %s", mongoDatabase)
 	logger.Printf("Admin UI:  %s", enabledLabel(adminConfigured))
+	logger.Printf("AI:        %s", aiStatusLabel(aiService))
 	logger.Println("Press Ctrl+C to stop")
 	logger.Println("------------------------------------------------------------")
 
@@ -201,4 +202,20 @@ func enabledLabel(enabled bool) string {
 		return "enabled"
 	}
 	return "not configured"
+}
+
+// aiStatusLabel reports whether the shared AI service is backing the server, and
+// whether a server-wide default key is available (which the tenant-less admin
+// document-extraction flow relies on).
+func aiStatusLabel(svc *ai.Service) string {
+	if svc == nil {
+		return "not configured (set AI_ENCRYPTION_KEY to enable)"
+	}
+	label := "enabled (" + svc.ProviderName() + ")"
+	if os.Getenv("ANTHROPIC_API_KEY") == "" {
+		label += " — per-tenant keys only, no server default (admin extraction falls back to OCR)"
+	} else {
+		label += " — server default key set"
+	}
+	return label
 }

@@ -153,6 +153,46 @@ func TestValidateAndStoreRejectsBadKey(t *testing.T) {
 	}
 }
 
+func TestAdminDefaultCredential(t *testing.T) {
+	t.Parallel()
+
+	svc, _ := newTestService(t, &stubProvider{}, "")
+	ctx := context.Background()
+
+	st, err := svc.DefaultStatus(ctx)
+	if err != nil {
+		t.Fatalf("status: %v", err)
+	}
+	if st.Paired || st.Source != "none" {
+		t.Fatalf("expected unpaired, got %#v", st)
+	}
+
+	if _, err := svc.SetDefault(ctx, "sk-ant-default-5555", "claude-opus-4-8"); err != nil {
+		t.Fatalf("set default: %v", err)
+	}
+
+	st, _ = svc.DefaultStatus(ctx)
+	if !st.Paired || st.Source != "stored" || st.KeyHint != "...5555" {
+		t.Fatalf("expected paired/stored, got %#v", st)
+	}
+
+	// A tenant-less resolve (admin flow) uses the stored default.
+	cred, err := svc.ResolveCredential(ctx, "")
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if cred.APIKey != "sk-ant-default-5555" || cred.Model != "claude-opus-4-8" {
+		t.Fatalf("unexpected resolved cred: %#v", cred)
+	}
+
+	if err := svc.DeleteDefault(ctx); err != nil {
+		t.Fatalf("delete default: %v", err)
+	}
+	if _, err := svc.ResolveCredential(ctx, ""); !errors.Is(err, ai.ErrNotConfigured) {
+		t.Fatalf("expected ErrNotConfigured after delete, got %v", err)
+	}
+}
+
 func TestListAndDelete(t *testing.T) {
 	t.Parallel()
 

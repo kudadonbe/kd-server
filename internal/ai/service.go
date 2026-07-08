@@ -95,31 +95,48 @@ func NewServiceFromEnv(credStore CredentialStore) (*Service, error) {
 // ProviderName returns the configured provider identifier.
 func (s *Service) ProviderName() string { return s.provider.Name() }
 
-// ResolveCredential returns a usable credential for the tenant: the tenant's own
-// stored key, else the server-wide default, else ErrNotConfigured.
+// ResolveCredential returns a usable credential for the tenant, in order of
+// precedence: the tenant's own stored key, the admin-managed stored default, the
+// server-wide env default, else ErrNotConfigured. An empty tenantID skips the
+// tenant lookup (used by tenant-less admin flows).
 func (s *Service) ResolveCredential(ctx context.Context, tenantID string) (Credential, error) {
-	provider := s.provider.Name()
-
-	stored, err := s.store.GetAICredential(ctx, tenantID, provider)
-	if err != nil {
-		return Credential{}, err
-	}
-	if stored != nil {
-		key, err := decrypt(s.masterKey, stored.Ciphertext)
-		if err != nil {
+	if tenantID != "" {
+		if cred, ok, err := s.storedCredential(ctx, tenantID); err != nil {
 			return Credential{}, err
+		} else if ok {
+			return cred, nil
 		}
-		model := stored.Model
-		if model == "" {
-			model = s.defaultModel
-		}
-		return Credential{Provider: provider, APIKey: string(key), Model: model}, nil
 	}
-
+	if cred, ok, err := s.storedCredential(ctx, globalScope); err != nil {
+		return Credential{}, err
+	} else if ok {
+		return cred, nil
+	}
 	if s.defaultKey != "" {
-		return Credential{Provider: provider, APIKey: s.defaultKey, Model: s.defaultModel}, nil
+		return Credential{Provider: s.provider.Name(), APIKey: s.defaultKey, Model: s.defaultModel}, nil
 	}
 	return Credential{}, ErrNotConfigured
+}
+
+// storedCredential loads and decrypts a stored credential for a scope (a tenant
+// ID or the global sentinel). ok is false when none exists.
+func (s *Service) storedCredential(ctx context.Context, scope string) (Credential, bool, error) {
+	stored, err := s.store.GetAICredential(ctx, scope, s.provider.Name())
+	if err != nil {
+		return Credential{}, false, err
+	}
+	if stored == nil {
+		return Credential{}, false, nil
+	}
+	key, err := decrypt(s.masterKey, stored.Ciphertext)
+	if err != nil {
+		return Credential{}, false, err
+	}
+	model := stored.Model
+	if model == "" {
+		model = s.defaultModel
+	}
+	return Credential{Provider: s.provider.Name(), APIKey: string(key), Model: model}, true, nil
 }
 
 // ValidateAndStore validates a plaintext key against the provider, then persists
