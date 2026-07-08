@@ -47,11 +47,14 @@ func aiCredentialsHandler(cfg Config) http.Handler {
 			}
 			meta, err := cfg.AIService.ValidateAndStore(r.Context(), tenantID, req.APIKey, req.Model)
 			if err != nil {
-				if errors.Is(err, ai.ErrInvalidKey) {
+				switch {
+				case errors.Is(err, ai.ErrInvalidKey):
 					writeJSON(w, http.StatusBadRequest, map[string]string{"error": "api key rejected by provider"})
-					return
+				case errors.Is(err, ai.ErrStorageDisabled):
+					writeJSON(w, http.StatusBadRequest, map[string]string{"error": "credential storage disabled; set AI_ENCRYPTION_KEY"})
+				default:
+					writeJSON(w, http.StatusBadGateway, map[string]string{"error": "could not validate api key"})
 				}
-				writeJSON(w, http.StatusBadGateway, map[string]string{"error": "could not validate api key"})
 				return
 			}
 			writeJSON(w, http.StatusOK, meta)

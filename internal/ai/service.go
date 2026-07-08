@@ -58,7 +58,9 @@ func NewService(credStore CredentialStore, cfg Config) (*Service, error) {
 	if cfg.Provider == nil {
 		return nil, errors.New("ai: provider is required")
 	}
-	if len(cfg.MasterKey) != masterKeySize {
+	// The master key is optional: without it, the env default key still works but
+	// storing per-tenant/admin keys is disabled. A wrong-length key is an error.
+	if len(cfg.MasterKey) != 0 && len(cfg.MasterKey) != masterKeySize {
 		return nil, fmt.Errorf("ai: master key must be %d bytes", masterKeySize)
 	}
 
@@ -76,21 +78,38 @@ func NewService(credStore CredentialStore, cfg Config) (*Service, error) {
 	}, nil
 }
 
-// NewServiceFromEnv builds a Service from environment configuration. It returns
-// (nil, error) when AI_ENCRYPTION_KEY is unset or invalid, so the caller can log
-// a warning and disable the feature gracefully (like NewLocalDocumentExtractor).
+// NewServiceFromEnv builds a Service from environment configuration. AI is
+// enabled when either a server default key (ANTHROPIC_API_KEY) or an encryption
+// key (AI_ENCRYPTION_KEY, which unlocks storing keys) is present. It returns
+// (nil, error) when neither is set — or when AI_ENCRYPTION_KEY is set but
+// invalid — so the caller can log a warning and disable the feature gracefully.
 func NewServiceFromEnv(credStore CredentialStore) (*Service, error) {
-	masterKey, err := parseMasterKey(os.Getenv("AI_ENCRYPTION_KEY"))
-	if err != nil {
-		return nil, err
+	defaultKey := strings.TrimSpace(os.Getenv("ANTHROPIC_API_KEY"))
+
+	var masterKey []byte
+	if raw := strings.TrimSpace(os.Getenv("AI_ENCRYPTION_KEY")); raw != "" {
+		mk, err := parseMasterKey(raw)
+		if err != nil {
+			return nil, err
+		}
+		masterKey = mk
 	}
+
+	if len(masterKey) == 0 && defaultKey == "" {
+		return nil, errors.New("ai: not configured (set ANTHROPIC_API_KEY and/or AI_ENCRYPTION_KEY)")
+	}
+
 	return NewService(credStore, Config{
 		MasterKey:    masterKey,
-		DefaultKey:   os.Getenv("ANTHROPIC_API_KEY"),
+		DefaultKey:   defaultKey,
 		DefaultModel: os.Getenv("AI_DEFAULT_MODEL"),
 		Provider:     newAnthropicProvider(),
 	})
 }
+
+// encryptionEnabled reports whether stored credentials are available (a valid
+// master key is present).
+func (s *Service) encryptionEnabled() bool { return len(s.masterKey) == masterKeySize }
 
 // ProviderName returns the configured provider identifier.
 func (s *Service) ProviderName() string { return s.provider.Name() }
@@ -121,6 +140,9 @@ func (s *Service) ResolveCredential(ctx context.Context, tenantID string) (Crede
 // storedCredential loads and decrypts a stored credential for a scope (a tenant
 // ID or the global sentinel). ok is false when none exists.
 func (s *Service) storedCredential(ctx context.Context, scope string) (Credential, bool, error) {
+	if !s.encryptionEnabled() {
+		return Credential{}, false, nil
+	}
 	stored, err := s.store.GetAICredential(ctx, scope, s.provider.Name())
 	if err != nil {
 		return Credential{}, false, err
@@ -142,6 +164,9 @@ func (s *Service) storedCredential(ctx context.Context, scope string) (Credentia
 // ValidateAndStore validates a plaintext key against the provider, then persists
 // it encrypted. It returns only non-secret metadata.
 func (s *Service) ValidateAndStore(ctx context.Context, tenantID, apiKey, model string) (CredentialMeta, error) {
+	if !s.encryptionEnabled() {
+		return CredentialMeta{}, ErrStorageDisabled
+	}
 	tenantID = strings.TrimSpace(tenantID)
 	apiKey = strings.TrimSpace(apiKey)
 	model = strings.TrimSpace(model)

@@ -153,6 +153,39 @@ func TestValidateAndStoreRejectsBadKey(t *testing.T) {
 	}
 }
 
+func TestEnvOnlyModeWithoutEncryption(t *testing.T) {
+	t.Parallel()
+
+	svc, err := ai.NewService(newMemStore(), ai.Config{
+		DefaultKey: "sk-ant-envonly-7777",
+		Provider:   &stubProvider{},
+	})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	ctx := context.Background()
+
+	// Resolves the env default even without a master key.
+	cred, err := svc.ResolveCredential(ctx, "")
+	if err != nil || cred.APIKey != "sk-ant-envonly-7777" {
+		t.Fatalf("resolve: %v cred=%#v", err, cred)
+	}
+
+	// Status reports paired via env.
+	st, err := svc.DefaultStatus(ctx)
+	if err != nil {
+		t.Fatalf("status: %v", err)
+	}
+	if !st.Paired || st.Source != "env" {
+		t.Fatalf("expected paired/env, got %#v", st)
+	}
+
+	// Storing a key is disabled without encryption.
+	if _, err := svc.SetDefault(ctx, "sk-ant-x", ""); !errors.Is(err, ai.ErrStorageDisabled) {
+		t.Fatalf("expected ErrStorageDisabled, got %v", err)
+	}
+}
+
 func TestAdminDefaultCredential(t *testing.T) {
 	t.Parallel()
 

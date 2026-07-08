@@ -191,11 +191,14 @@ func adminAPIHandler(cfg Config, adminAuth *adminAuthenticator) http.Handler {
 			}
 			meta, err := cfg.AIService.SetDefault(r.Context(), req.APIKey, req.Model)
 			if err != nil {
-				if errors.Is(err, ai.ErrInvalidKey) {
+				switch {
+				case errors.Is(err, ai.ErrInvalidKey):
 					writeJSON(w, http.StatusBadRequest, map[string]string{"error": "api key rejected by provider"})
-					return
+				case errors.Is(err, ai.ErrStorageDisabled):
+					writeJSON(w, http.StatusBadRequest, map[string]string{"error": "set AI_ENCRYPTION_KEY to store a key in the UI (the .env ANTHROPIC_API_KEY is already active)"})
+				default:
+					writeJSON(w, http.StatusBadGateway, map[string]string{"error": "could not validate api key"})
 				}
-				writeJSON(w, http.StatusBadGateway, map[string]string{"error": "could not validate api key"})
 				return
 			}
 			w.Header().Set("Cache-Control", "no-store")

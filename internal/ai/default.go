@@ -25,18 +25,20 @@ func (s *Service) DefaultStatus(ctx context.Context) (DefaultStatus, error) {
 	provider := s.provider.Name()
 	status := DefaultStatus{Configured: true, Provider: provider, Model: s.defaultModel, Source: "none"}
 
-	stored, err := s.store.GetAICredential(ctx, globalScope, provider)
-	if err != nil {
-		return status, err
-	}
-	if stored != nil {
-		status.Paired = true
-		status.Source = "stored"
-		status.KeyHint = stored.KeyHint
-		if stored.Model != "" {
-			status.Model = stored.Model
+	if s.encryptionEnabled() {
+		stored, err := s.store.GetAICredential(ctx, globalScope, provider)
+		if err != nil {
+			return status, err
 		}
-		return status, nil
+		if stored != nil {
+			status.Paired = true
+			status.Source = "stored"
+			status.KeyHint = stored.KeyHint
+			if stored.Model != "" {
+				status.Model = stored.Model
+			}
+			return status, nil
+		}
 	}
 	if s.defaultKey != "" {
 		status.Paired = true

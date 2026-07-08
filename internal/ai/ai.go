@@ -25,6 +25,10 @@ var (
 
 	// ErrInvalidKey means the provider rejected the API key.
 	ErrInvalidKey = errors.New("ai: api key rejected by provider")
+
+	// ErrStorageDisabled means a key cannot be stored because encryption is off
+	// (AI_ENCRYPTION_KEY is not set). The env default key still works.
+	ErrStorageDisabled = errors.New("ai: credential storage disabled (set AI_ENCRYPTION_KEY)")
 )
 
 // Credential is a resolved, decrypted credential ready to call a provider.
