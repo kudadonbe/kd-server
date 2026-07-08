@@ -158,6 +158,13 @@ func TestDefaultIndexSpecs(t *testing.T) {
 				keys: bson.D{{Key: "tenantId", Value: 1}, {Key: "eventType", Value: 1}},
 			},
 		},
+		"ai_credentials": {
+			{
+				name:   "ai_credentials_tenant_provider",
+				keys:   bson.D{{Key: "tenantId", Value: 1}, {Key: "provider", Value: 1}},
+				unique: true,
+			},
+		},
 	}
 
 	if len(specs) != len(expected) {

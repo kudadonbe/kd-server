@@ -203,6 +203,95 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /ai/credentials:
+    get:
+      summary: List AI credentials
+      description: Returns the tenant's stored AI provider credentials as masked metadata (never the key).
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      responses:
+        '200':
+          description: Masked credential metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AICredentialListResponse'
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      summary: Store an AI credential
+      description: |
+        Validates a bring-your-own AI provider API key against the provider, then
+        stores it encrypted at rest. The response contains only masked metadata.
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AICredentialRequest'
+      responses:
+        '200':
+          description: Credential validated and stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AICredentialMeta'
+        '400':
+          description: Missing api_key or the provider rejected the key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Could not reach the provider to validate the key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /ai/credentials/{provider}:
+    delete:
+      summary: Delete an AI credential
+      security:
+        - bearerAuth: []
+          tenantHeader: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            example: anthropic
+      responses:
+        '200':
+          description: Credential removed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: boolean
+                    example: true
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /review:
     get:
       summary: List review items
@@ -554,6 +643,53 @@ components:
           example: invalid token
       required:
         - error
+    AICredentialRequest:
+      type: object
+      properties:
+        api_key:
+          type: string
+          description: The provider API key. Validated then stored encrypted; never returned.
+        model:
+          type: string
+          description: Optional default model for this credential.
+          example: claude-sonnet-5
+      required:
+        - api_key
+    AICredentialMeta:
+      type: object
+      description: Non-secret view of a stored credential. Never contains the API key.
+      properties:
+        provider:
+          type: string
+          example: anthropic
+        model:
+          type: string
+          example: claude-sonnet-5
+        key_hint:
+          type: string
+          description: Masked tail of the key.
+          example: '...9876'
+        validated_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - provider
+        - key_hint
+    AICredentialListResponse:
+      type: object
+      properties:
+        credentials:
+          type: array
+          items:
+            $ref: '#/components/schemas/AICredentialMeta'
+      required:
+        - credentials
     IngestRequest:
       type: object
       properties:

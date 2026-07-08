@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/kudadonbe/kd-server/internal/ai"
 	"github.com/kudadonbe/kd-server/internal/auth"
 	"github.com/kudadonbe/kd-server/internal/config"
 	apphttp "github.com/kudadonbe/kd-server/internal/http"
@@ -103,6 +104,11 @@ func main() {
 		assetService.SetClassificationService(classificationService)
 	}
 
+	aiService, err := ai.NewServiceFromEnv(mongoStore)
+	if err != nil {
+		logger.Printf("warning: AI service disabled: %v", err)
+	}
+
 	handler := apphttp.NewHandler(apphttp.Config{
 		Logger:                logger,
 		VersionService:        versionService,
@@ -117,6 +123,7 @@ func main() {
 		AdminService:          adminService,
 		IdentityDocuments:     identityDocumentService,
 		DocumentExtractor:     documentExtractor,
+		AIService:             aiService,
 		AdminUsername:         os.Getenv("KD_ADMIN_USERNAME"),
 		AdminPassword:         os.Getenv("KD_ADMIN_PASSWORD"),
 	})

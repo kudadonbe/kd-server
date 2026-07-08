@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kudadonbe/kd-server/internal/ai"
 	"github.com/kudadonbe/kd-server/internal/auth"
 	"github.com/kudadonbe/kd-server/internal/services"
 )
@@ -29,6 +30,7 @@ type Config struct {
 	AdminService          *services.AdminService
 	IdentityDocuments     services.IdentityDocuments
 	DocumentExtractor     services.DocumentExtractor
+	AIService             *ai.Service
 	AdminUsername         string
 	AdminPassword         string
 }
@@ -90,6 +92,13 @@ func NewHandler(cfg Config) http.Handler {
 	mux.Handle("/v1/lookup/email/", authMiddleware(cfg)(lookupEmailHandler(cfg)))
 	mux.Handle("/v1/review", authMiddleware(cfg)(reviewListHandler(cfg)))
 	mux.Handle("/v1/review/", authMiddleware(cfg)(reviewDecisionHandler(cfg)))
+
+	// Shared AI credential management (tenant brings its own key). Registered
+	// only when the AI service is configured (AI_ENCRYPTION_KEY set).
+	if cfg.AIService != nil {
+		mux.Handle("/v1/ai/credentials", authMiddleware(cfg)(aiCredentialsHandler(cfg)))
+		mux.Handle("/v1/ai/credentials/", authMiddleware(cfg)(aiCredentialsHandler(cfg)))
+	}
 
 	// Asset management endpoints
 	if cfg.AssetService != nil {

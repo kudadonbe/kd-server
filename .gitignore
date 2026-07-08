@@ -26,6 +26,8 @@ coverage.*
 *.local.http
 *.local.rest
 test.rest
+# Local REST test files hold real API keys; commit the .example instead.
+ai.rest
 /tmp/*
 
 # Logs

@@ -275,6 +275,12 @@ func defaultIndexSpecs() map[string][]mongo.IndexModel {
 				Options: options.Index().SetName("asset_history_tenant_event"),
 			},
 		},
+		"ai_credentials": {
+			{
+				Keys:    bson.D{{Key: "tenantId", Value: 1}, {Key: "provider", Value: 1}},
+				Options: options.Index().SetName("ai_credentials_tenant_provider").SetUnique(true),
+			},
+		},
 	}
 }
 

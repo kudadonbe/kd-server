@@ -1,0 +1,43 @@
+# Shared AI credential management — manual API tests (REST Client / JetBrains HTTP).
+#
+# 1. Copy this file to ai.rest (gitignored — keeps your real key out of git).
+# 2. Generate an encryption key and set it before starting the API:
+#      AI_ENCRYPTION_KEY=$(openssl rand -base64 32)
+#    (in .env, or the process environment). Then: go run ./cmd/api
+# 3. Create a tenant + tenant key via the admin console / TUI, fill in @tenantKey.
+# 4. Paste your real Anthropic key into the POST body and Send Request.
+
+@baseUrl = http://localhost:18080
+@tenant = pem
+# A TUI-issued tenant API key (key_...) or an HS256 JWT with a matching tenant claim.
+@tenantKey = key_yourKeyId.yourSecret
+
+### Store a bring-your-own Anthropic key — validated, then stored encrypted.
+# Response is masked metadata only (never echoes the key).
+POST {{baseUrl}}/v1/ai/credentials
+Authorization: Bearer {{tenantKey}}
+X-KD-Tenant: {{tenant}}
+Content-Type: application/json
+
+{
+  "api_key": "sk-ant-REPLACE_WITH_YOUR_KEY",
+  "model": "claude-sonnet-5"
+}
+
+### List stored credentials (masked)
+GET {{baseUrl}}/v1/ai/credentials
+Authorization: Bearer {{tenantKey}}
+X-KD-Tenant: {{tenant}}
+
+### Delete the Anthropic credential
+DELETE {{baseUrl}}/v1/ai/credentials/anthropic
+Authorization: Bearer {{tenantKey}}
+X-KD-Tenant: {{tenant}}
+
+### Reject a bad key — expect 400
+POST {{baseUrl}}/v1/ai/credentials
+Authorization: Bearer {{tenantKey}}
+X-KD-Tenant: {{tenant}}
+Content-Type: application/json
+
+{ "api_key": "not-a-real-key" }
