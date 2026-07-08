@@ -34,11 +34,13 @@ type Credential struct {
 	Model    string
 }
 
-// Provider is an LLM backend. PR1 only requires Validate; document extraction is
-// added in a later part.
+// Provider is an LLM backend.
 type Provider interface {
 	// Name returns the provider identifier (e.g. "anthropic").
 	Name() string
 	// Validate confirms the credential works via a minimal, cheap call.
 	Validate(ctx context.Context, cred Credential) error
+	// Extract reads a document (image or PDF) and returns structured fields
+	// matching the request's schema.
+	Extract(ctx context.Context, cred Credential, req ExtractionRequest) (ExtractionResult, error)
 }

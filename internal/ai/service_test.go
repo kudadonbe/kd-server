@@ -24,6 +24,10 @@ func (s *stubProvider) Validate(_ context.Context, cred ai.Credential) error {
 	return s.validateErr
 }
 
+func (s *stubProvider) Extract(_ context.Context, _ ai.Credential, _ ai.ExtractionRequest) (ai.ExtractionResult, error) {
+	return ai.ExtractionResult{}, nil
+}
+
 // memStore is an in-memory CredentialStore keyed by tenant|provider.
 type memStore struct {
 	creds map[string]store.AICredential

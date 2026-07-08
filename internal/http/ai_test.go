@@ -23,6 +23,10 @@ func (s stubAIProvider) Name() string { return ai.ProviderAnthropic }
 
 func (s stubAIProvider) Validate(context.Context, ai.Credential) error { return s.validateErr }
 
+func (s stubAIProvider) Extract(context.Context, ai.Credential, ai.ExtractionRequest) (ai.ExtractionResult, error) {
+	return ai.ExtractionResult{}, nil
+}
+
 type memAICredentialStore struct {
 	creds map[string]store.AICredential
 }

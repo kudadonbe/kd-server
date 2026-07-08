@@ -109,6 +109,17 @@ func main() {
 		logger.Printf("warning: AI service disabled: %v", err)
 	}
 
+	// Document extraction: prefer the vision model, fall back to local OCR.
+	// documentExtractor is a nil pointer when OCR is unavailable, so guard the
+	// interface conversion to avoid a non-nil interface wrapping a nil pointer.
+	var docExtractor services.DocumentExtractor
+	if documentExtractor != nil {
+		docExtractor = documentExtractor
+	}
+	if aiService != nil {
+		docExtractor = services.NewAIDocumentExtractor(aiService, docExtractor)
+	}
+
 	handler := apphttp.NewHandler(apphttp.Config{
 		Logger:                logger,
 		VersionService:        versionService,
@@ -122,7 +133,7 @@ func main() {
 		ClassificationService: classificationService,
 		AdminService:          adminService,
 		IdentityDocuments:     identityDocumentService,
-		DocumentExtractor:     documentExtractor,
+		DocumentExtractor:     docExtractor,
 		AIService:             aiService,
 		AdminUsername:         os.Getenv("KD_ADMIN_USERNAME"),
 		AdminPassword:         os.Getenv("KD_ADMIN_PASSWORD"),
