@@ -89,6 +89,7 @@ func main() {
 	resolveService := services.NewResolveService(mongoStore)
 	lookupService := services.NewLookupService(mongoStore)
 	reviewService := services.NewReviewService(mongoStore)
+	searchService := services.NewEntitySearchService(mongoStore)
 	assetService := services.NewAssetService(mongoStore)
 	adminService := services.NewAdminService(mongoStore)
 	identityDocumentService := services.NewIdentityDocumentService(mongoStore)
@@ -129,6 +130,7 @@ func main() {
 		ResolveService:        resolveService,
 		LookupService:         lookupService,
 		ReviewService:         reviewService,
+		SearchService:         searchService,
 		AssetService:          assetService,
 		ClassificationService: classificationService,
 		AdminService:          adminService,

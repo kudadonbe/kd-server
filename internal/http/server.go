@@ -25,6 +25,7 @@ type Config struct {
 	ResolveService        services.Resolver
 	LookupService         services.Lookup
 	ReviewService         services.Review
+	SearchService         services.EntitySearch
 	AssetService          *services.AssetService
 	ClassificationService *services.ClassificationService
 	AdminService          *services.AdminService
@@ -101,6 +102,13 @@ func NewHandler(cfg Config) http.Handler {
 	mux.Handle("/v1/lookup/email/", authMiddleware(cfg)(lookupEmailHandler(cfg)))
 	mux.Handle("/v1/review", authMiddleware(cfg)(reviewListHandler(cfg)))
 	mux.Handle("/v1/review/", authMiddleware(cfg)(reviewDecisionHandler(cfg)))
+
+	// Multi-signal entity search (shared across apps). Optional: registered only
+	// when a search service is wired.
+	if cfg.SearchService != nil {
+		mux.Handle("/v1/search/reindex", authMiddleware(cfg)(reindexHandler(cfg)))
+		mux.Handle("/v1/search", authMiddleware(cfg)(searchHandler(cfg)))
+	}
 
 	// Shared AI credential management (tenant brings its own key). Registered
 	// only when the AI service is configured (AI_ENCRYPTION_KEY set).

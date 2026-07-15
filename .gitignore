@@ -29,6 +29,7 @@ test.rest
 # Local REST test files hold real API keys — keep them out of git.
 ai.rest
 pem.rest
+search.rest
 /tmp/*
 
 # Logs

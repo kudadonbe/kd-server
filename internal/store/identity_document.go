@@ -123,5 +123,6 @@ func (s *MongoStore) SaveIdentityDocument(ctx context.Context, document Identity
 		return nil, fmt.Errorf("store: insert identity document history: %w", err)
 	}
 
+	s.rebuildEntityIndexBestEffort(ctx, document.TenantID, document.PersonID)
 	return &document, nil
 }

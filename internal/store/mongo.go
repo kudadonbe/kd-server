@@ -281,6 +281,24 @@ func defaultIndexSpecs() map[string][]mongo.IndexModel {
 				Options: options.Index().SetName("ai_credentials_tenant_provider").SetUnique(true),
 			},
 		},
+		"entity_index": {
+			{
+				Keys:    bson.D{{Key: "tenantId", Value: 1}, {Key: "personId", Value: 1}},
+				Options: options.Index().SetName("entity_index_tenant_person").SetUnique(true),
+			},
+			{
+				Keys:    bson.D{{Key: "tenantId", Value: 1}, {Key: "terms", Value: 1}},
+				Options: options.Index().SetName("entity_index_terms"),
+			},
+			{
+				Keys:    bson.D{{Key: "tenantId", Value: 1}, {Key: "nationalId", Value: 1}},
+				Options: options.Index().SetName("entity_index_national_id"),
+			},
+			{
+				Keys:    bson.D{{Key: "tenantId", Value: 1}, {Key: "dateOfBirth", Value: 1}},
+				Options: options.Index().SetName("entity_index_dob"),
+			},
+		},
 	}
 }
 

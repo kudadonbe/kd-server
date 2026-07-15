@@ -77,6 +77,7 @@ func (s *MongoStore) CreatePerson(ctx context.Context, tenantID string, identifi
 		return nil, fmt.Errorf("store: insert person: %w", err)
 	}
 
+	s.rebuildEntityIndexBestEffort(ctx, tenantID, person.PersonID)
 	return &person, nil
 }
 
@@ -143,6 +144,8 @@ func (s *MongoStore) UpsertLink(ctx context.Context, tenantID, personID, source,
 	if err != nil {
 		return fmt.Errorf("store: upsert link: %w", err)
 	}
+
+	s.rebuildEntityIndexBestEffort(ctx, tenantID, personID)
 	return nil
 }
 

@@ -10,6 +10,9 @@
 - **IDENTITY_DOCUMENTS.md** - Maldivian identity-document fields, tracing, and security rules
 - **CLIENT_UI_BUILD_GUIDE.md** - UI building guidelines
 
+## Roadmaps (tracked part-by-part)
+- **[KYC_ENTITY_HUB_ROADMAP.md](./KYC_ENTITY_HUB_ROADMAP.md)** - Multi-signal entity search, scoped access, and ID-card finalize; checklist updated as parts land
+
 ## Development Notes
 - **SESSION_NOTES.md** - Development session notes and decisions
 

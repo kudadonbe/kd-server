@@ -165,6 +165,25 @@ func TestDefaultIndexSpecs(t *testing.T) {
 				unique: true,
 			},
 		},
+		"entity_index": {
+			{
+				name:   "entity_index_tenant_person",
+				keys:   bson.D{{Key: "tenantId", Value: 1}, {Key: "personId", Value: 1}},
+				unique: true,
+			},
+			{
+				name: "entity_index_terms",
+				keys: bson.D{{Key: "tenantId", Value: 1}, {Key: "terms", Value: 1}},
+			},
+			{
+				name: "entity_index_national_id",
+				keys: bson.D{{Key: "tenantId", Value: 1}, {Key: "nationalId", Value: 1}},
+			},
+			{
+				name: "entity_index_dob",
+				keys: bson.D{{Key: "tenantId", Value: 1}, {Key: "dateOfBirth", Value: 1}},
+			},
+		},
 	}
 
 	if len(specs) != len(expected) {

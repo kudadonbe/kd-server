@@ -180,7 +180,8 @@ Examples:
 
 ## 🚀 After Phase 1
 - Phase 2 → Markdown + AI summarization.  
-- Phase 3 → Cross-app intelligence & advanced linking.
+- Phase 3 → Cross-app intelligence & advanced linking.  
+- **KYC / entity hub** (multi-signal search, scoped access, ID-card finalize) is tracked part-by-part in [`docs/KYC_ENTITY_HUB_ROADMAP.md`](docs/KYC_ENTITY_HUB_ROADMAP.md).
 
 ---
 
