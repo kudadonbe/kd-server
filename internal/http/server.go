@@ -33,6 +33,8 @@ type Config struct {
 	AIService             *ai.Service
 	AdminUsername         string
 	AdminPassword         string
+	ServerName            string
+	Environment           string
 }
 
 // NewHandler wires the HTTP routes with basic middleware.
@@ -68,9 +70,16 @@ func NewHandler(cfg Config) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/", landingHandler)
-	mux.HandleFunc("/admin", adminPageHandler)
+	mux.Handle("/admin/static/", staticHandler())
+
+	adminAuth := newAdminAuthenticator(cfg.AdminUsername, cfg.AdminPassword)
+	branding := newBrandingState(cfg.ServerName, cfg.Environment)
+	console := adminConsoleHandler(cfg, adminAuth, branding)
+	mux.Handle("/admin", console)
+	mux.Handle("/admin/", console)
 	if cfg.AdminService != nil {
-		adminAuth := newAdminAuthenticator(cfg.AdminUsername, cfg.AdminPassword)
+		mux.HandleFunc("/admin/identity", identityDocumentPageHandler)
+		mux.Handle("/admin/hx/", adminHXHandler(cfg, adminAuth, branding))
 		mux.Handle("/admin/api/", adminAPIHandler(cfg, adminAuth))
 	}
 	mux.HandleFunc("/v1/healthz", healthHandler)

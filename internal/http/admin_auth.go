@@ -80,6 +80,25 @@ func (a *adminAuthenticator) logout(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// logoutAll invalidates every active admin session (including the caller's) and
+// returns how many were cleared. Used by the settings "sign out everywhere" action.
+func (a *adminAuthenticator) logoutAll() int {
+	a.mu.Lock()
+	n := len(a.sessions)
+	a.sessions = make(map[string]time.Time)
+	a.mu.Unlock()
+	return n
+}
+
+// sessionCount returns the number of currently active (unexpired) admin sessions.
+func (a *adminAuthenticator) sessionCount() int {
+	now := time.Now()
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.removeExpiredLocked(now)
+	return len(a.sessions)
+}
+
 func (a *adminAuthenticator) middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie(adminSessionCookie)
@@ -89,6 +108,12 @@ func (a *adminAuthenticator) middleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// authenticated reports whether the request carries a valid admin session.
+func (a *adminAuthenticator) authenticated(r *http.Request) bool {
+	cookie, err := r.Cookie(adminSessionCookie)
+	return err == nil && a.validSession(cookie.Value)
 }
 
 func (a *adminAuthenticator) validSession(token string) bool {

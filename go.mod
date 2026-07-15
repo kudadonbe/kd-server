@@ -1,15 +1,16 @@
 module github.com/kudadonbe/kd-server
 
-go 1.24
+go 1.25.0
 
 require (
+	github.com/a-h/templ v0.3.1020
+	github.com/anthropics/anthropic-sdk-go v1.56.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/joho/godotenv v1.5.1
 	go.mongodb.org/mongo-driver v1.17.9
 )
 
 require (
-	github.com/anthropics/anthropic-sdk-go v1.56.0 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.2 // indirect
 	github.com/golang/snappy v0.0.4 // indirect

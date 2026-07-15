@@ -111,6 +111,11 @@ func NewServiceFromEnv(credStore CredentialStore) (*Service, error) {
 // master key is present).
 func (s *Service) encryptionEnabled() bool { return len(s.masterKey) == masterKeySize }
 
+// StorageEnabled reports whether encrypted key storage is available (AI_ENCRYPTION_KEY
+// is set). When false, only the ANTHROPIC_API_KEY env fallback works and keys cannot
+// be paired/stored from the admin console. Exposed for the settings/server-info view.
+func (s *Service) StorageEnabled() bool { return s.encryptionEnabled() }
+
 // ProviderName returns the configured provider identifier.
 func (s *Service) ProviderName() string { return s.provider.Name() }
 

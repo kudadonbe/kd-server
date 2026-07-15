@@ -137,6 +137,8 @@ func main() {
 		AIService:             aiService,
 		AdminUsername:         os.Getenv("KD_ADMIN_USERNAME"),
 		AdminPassword:         os.Getenv("KD_ADMIN_PASSWORD"),
+		ServerName:            os.Getenv("KD_SERVER_NAME"),
+		Environment:           os.Getenv("KD_ENV"),
 	})
 
 	server := &http.Server{

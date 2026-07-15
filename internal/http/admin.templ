@@ -1,0 +1,345 @@
+package http
+
+import (
+	"github.com/kudadonbe/kd-server/internal/ai"
+	"github.com/kudadonbe/kd-server/internal/services"
+)
+
+// ── Layout ──────────────────────────────────────────────────────────────────
+
+templ Layout(title string) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width,initial-scale=1"/>
+			<title>{ title }</title>
+			<link rel="stylesheet" href="/admin/static/admin.css"/>
+			<script src="/admin/static/htmx.min.js"></script>
+		</head>
+		<body>
+			{ children... }
+		</body>
+	</html>
+}
+
+// Shell is the authenticated console frame: sidebar + topbar + the active panel.
+templ Shell(sd shellData, active string, panel comp) {
+	@Layout(sd.ServerName + " · admin") {
+		<div class="app">
+			@sidebar(sd, active)
+			<div class="main">
+				@topbar(sd)
+				<section id="panel" class="panel">
+					@panel
+				</section>
+			</div>
+		</div>
+	}
+}
+
+templ LoginPage(serverName string) {
+	@Layout(serverName + " · admin") {
+		<main class="loginshell">
+			<section class="card narrow">
+				<div class="brand big">{ serverName }</div>
+				<h2>Administrator login</h2>
+				<form hx-post="/admin/hx/login" hx-target="#loginMsg" hx-swap="innerHTML">
+					<label>User ID</label>
+					<input name="username" autocomplete="username"/>
+					<label>Password</label>
+					<input name="password" type="password" autocomplete="current-password"/>
+					<button type="submit">Sign in</button>
+				</form>
+				<div id="loginMsg"></div>
+			</section>
+		</main>
+	}
+}
+
+// ── Sidebar & topbar (OOB-swappable) ────────────────────────────────────────
+
+templ sidebar(sd shellData, active string) {
+	<aside id="sidebar" class="sidebar">
+		@sidebarInner(sd, active)
+	</aside>
+}
+
+templ sidebarOOB(sd shellData, active string) {
+	<aside id="sidebar" class="sidebar" hx-swap-oob="true">
+		@sidebarInner(sd, active)
+	</aside>
+}
+
+templ sidebarInner(sd shellData, active string) {
+	<div class="brand">{ sd.ServerName }</div>
+	<nav class="nav">
+		@navLink("overview", "Overview", "/admin", active)
+		@navLink("tenants", "Tenants", "/admin/tenants", active)
+		@navLink("keys", "API keys", "/admin/keys", active)
+		@navLink("settings", "Settings", "/admin/settings", active)
+		<div class="navsep">Tools</div>
+		<a class="navlink" href="/admin/identity">Identity docs</a>
+	</nav>
+}
+
+templ navLink(key string, label string, href string, active string) {
+	<a
+		class={ navClass(active, key) }
+		href={ href }
+		hx-get={ href }
+		hx-target="#panel"
+		hx-swap="innerHTML"
+		hx-push-url="true"
+	>{ label }</a>
+}
+
+templ topbar(sd shellData) {
+	<header id="topbar" class="topbar">
+		@topbarInner(sd)
+	</header>
+}
+
+templ topbarOOB(sd shellData) {
+	<header id="topbar" class="topbar" hx-swap-oob="true">
+		@topbarInner(sd)
+	</header>
+}
+
+templ topbarInner(sd shellData) {
+	<div class="crumbs">{ sd.ServerName } <span class="muted">· admin console</span></div>
+	<div class="topright">
+		<span class="badge">{ sd.Env }</span>
+		@aiPill(sd)
+		<button class="danger sm" hx-post="/admin/hx/logout">Log out</button>
+	</div>
+}
+
+templ aiPill(sd shellData) {
+	if !sd.AIEnabled {
+		<span class="pill off">AI off</span>
+	} else if sd.AIPaired {
+		<span class="pill on">● AI paired</span>
+	} else {
+		<span class="pill warn">AI unpaired</span>
+	}
+}
+
+// ── Panels ──────────────────────────────────────────────────────────────────
+
+templ OverviewPanel(sd shellData, tiles []tileVM) {
+	<div class="panelhead">
+		<h1>Overview</h1>
+		<p class="muted">Server status at a glance.</p>
+	</div>
+	<div class="tiles">
+		for _, t := range tiles {
+			@tile(t)
+		}
+	</div>
+	<section class="card">
+		<h2>Quick actions</h2>
+		<div class="quick">
+			<a class="btn" href="/admin/tenants" hx-get="/admin/tenants" hx-target="#panel" hx-swap="innerHTML" hx-push-url="true">Create a tenant</a>
+			<a class="btn" href="/admin/keys" hx-get="/admin/keys" hx-target="#panel" hx-swap="innerHTML" hx-push-url="true">Issue an API key</a>
+			<a class="btn" href="/admin/settings" hx-get="/admin/settings" hx-target="#panel" hx-swap="innerHTML" hx-push-url="true">Configure AI</a>
+			<a class="btn ghost" href="/admin/identity">Identity extraction</a>
+		</div>
+	</section>
+}
+
+templ tile(t tileVM) {
+	if t.Href != "" {
+		<a class="tile" href={ t.Href } hx-get={ t.Href } hx-target="#panel" hx-swap="innerHTML" hx-push-url="true">
+			<div class="tlabel">{ t.Label }</div>
+			<div class="tvalue">{ t.Value }</div>
+			<div class="taction">{ t.Action } →</div>
+		</a>
+	} else {
+		<div class="tile">
+			<div class="tlabel">{ t.Label }</div>
+			<div class="tvalue">{ t.Value }</div>
+		</div>
+	}
+}
+
+templ TenantsPanel(tenants []services.TenantSummary) {
+	<div class="panelhead">
+		<h1>Tenants</h1>
+		<p class="muted">Create tenants and review the directory.</p>
+	</div>
+	<div class="grid2">
+		<section class="card">
+			<h2>Create tenant</h2>
+			<form hx-post="/admin/hx/tenants" hx-target="#tenantMsg" hx-swap="innerHTML">
+				<label>Name</label>
+				<input name="name" placeholder="Family Court"/>
+				<label>Slug</label>
+				<input name="slug" placeholder="fc"/>
+				<button type="submit">Create tenant</button>
+			</form>
+			<div id="tenantMsg"></div>
+		</section>
+		<section class="card">
+			<h2>All tenants</h2>
+			<table>
+				<thead><tr><th>Slug</th><th>Name</th><th>Created</th></tr></thead>
+				<tbody id="tenants">
+					@TenantsRows(tenants)
+				</tbody>
+			</table>
+		</section>
+	</div>
+}
+
+templ KeysPanel(tenants []services.TenantSummary) {
+	<div class="panelhead">
+		<h1>API keys</h1>
+		<p class="muted">Issue and revoke tenant API keys.</p>
+	</div>
+	<div class="grid2">
+		<section class="card">
+			<h2>Issue key</h2>
+			<form hx-post="/admin/hx/keys" hx-target="#keySecret" hx-swap="innerHTML">
+				<label>Tenant</label>
+				@tenantSelect(tenants)
+				<label>Label</label>
+				<input name="label" placeholder="production"/>
+				<button type="submit">Issue key</button>
+			</form>
+			<div id="keySecret"></div>
+		</section>
+		<section class="card">
+			<h2>Revoke key</h2>
+			<form hx-post="/admin/hx/keys/revoke" hx-target="#revokeMsg" hx-swap="innerHTML">
+				<label>Tenant</label>
+				@tenantSelect(tenants)
+				<label>Key ID</label>
+				<input name="key_id" placeholder="key_..."/>
+				<button class="danger" type="submit">Revoke key</button>
+			</form>
+			<div id="revokeMsg"></div>
+		</section>
+	</div>
+}
+
+templ SettingsPanel(d settingsData) {
+	<div class="panelhead">
+		<h1>Settings</h1>
+		<p class="muted">AI provider, server info, security, and branding.</p>
+	</div>
+	<div class="grid2">
+		@AICard(d.AIStatus, d.AIEnabled)
+		<section class="card">
+			<h2>Server info</h2>
+			<dl class="kv">
+				<dt>Server</dt><dd>{ d.ServerName }</dd>
+				<dt>Environment</dt><dd>{ d.Env }</dd>
+				<dt>Version</dt><dd>{ d.Version }</dd>
+				<dt>AI provider</dt><dd>{ aiSourceText(d) }</dd>
+				<dt>Key storage</dt><dd>{ storageText(d.StorageEnabled) }</dd>
+			</dl>
+		</section>
+		<section class="card">
+			<h2>Admin security</h2>
+			<p class="muted">Admin credentials are set via KD_ADMIN_USERNAME / KD_ADMIN_PASSWORD.</p>
+			<dl class="kv">
+				<dt>Active sessions</dt><dd>{ sessionsText(d.Sessions) }</dd>
+			</dl>
+			<form hx-post="/admin/hx/logout-all">
+				<button class="danger" type="submit">Sign out all sessions</button>
+			</form>
+		</section>
+		<section class="card">
+			<h2>Branding</h2>
+			<p class="muted">Display name and environment badge for this console (resets on restart).</p>
+			<form hx-post="/admin/hx/branding" hx-target="#brandingMsg" hx-swap="innerHTML">
+				<label>Server name</label>
+				<input name="name" value={ d.ServerName }/>
+				<label>Environment badge</label>
+				<input name="env" value={ d.Env }/>
+				<button type="submit">Save branding</button>
+			</form>
+			<div id="brandingMsg"></div>
+		</section>
+	</div>
+}
+
+// ── AI card ─────────────────────────────────────────────────────────────────
+
+templ AICard(status ai.DefaultStatus, enabled bool) {
+	<section class="card" id="aiCard">
+		<h2>AI provider</h2>
+		<div id="aiStatus">
+			@AIStatus(status, enabled)
+		</div>
+		if enabled {
+			<form hx-post="/admin/hx/ai-credentials" hx-target="#aiStatus" hx-swap="innerHTML">
+				<label>Anthropic API key</label>
+				<input name="api_key" type="password" autocomplete="off" placeholder="sk-ant-..."/>
+				<label>Model (optional)</label>
+				<input name="model" placeholder="claude-sonnet-5"/>
+				<div class="row">
+					<button type="submit">Pair AI</button>
+					<button type="button" class="danger" hx-delete="/admin/hx/ai-credentials" hx-target="#aiStatus" hx-swap="innerHTML">Unpair</button>
+					<button type="button" hx-post="/admin/hx/ai-validate" hx-target="#aiValidate" hx-swap="innerHTML">Test key (live)</button>
+				</div>
+			</form>
+			<div id="aiValidate"></div>
+		}
+	</section>
+}
+
+templ AIStatus(status ai.DefaultStatus, enabled bool) {
+	if !enabled {
+		<div class="muted">AI is not enabled on this server (set ANTHROPIC_API_KEY).</div>
+	} else if status.Paired {
+		<div class="ok">AI paired ✓ — { status.Provider } · { status.Model } · key { status.KeyHint } · source: { status.Source }</div>
+	} else {
+		<div class="muted">AI enabled but not paired — add a key below.</div>
+	}
+}
+
+// ── Shared fragments ────────────────────────────────────────────────────────
+
+templ tenantSelect(tenants []services.TenantSummary) {
+	<select name="tenant">
+		for _, t := range tenants {
+			<option value={ t.Slug }>{ t.Name } ({ t.Slug })</option>
+		}
+	</select>
+}
+
+templ TenantsRows(tenants []services.TenantSummary) {
+	if len(tenants) == 0 {
+		<tr><td colspan="3" class="muted">No tenants yet.</td></tr>
+	} else {
+		for _, t := range tenants {
+			<tr><td>{ t.Slug }</td><td>{ t.Name }</td><td>{ t.CreatedAt.Format("2006-01-02") }</td></tr>
+		}
+	}
+}
+
+// TenantCreated shows a message and updates the tenants table out-of-band.
+templ TenantCreated(tenants []services.TenantSummary, message string) {
+	@Message(message, true)
+	<tbody id="tenants" hx-swap-oob="true">
+		@TenantsRows(tenants)
+	</tbody>
+}
+
+templ IssuedKey(secret string, keyID string) {
+	<div class="ok mono">
+		Save this secret now — it will not be shown again:
+		<br/><br/>{ secret }
+		<br/><br/>Key ID: { keyID }
+	</div>
+}
+
+templ Message(text string, ok bool) {
+	if ok {
+		<div class="ok">{ text }</div>
+	} else {
+		<div class="err">{ text }</div>
+	}
+}
