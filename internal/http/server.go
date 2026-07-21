@@ -32,6 +32,7 @@ type Config struct {
 	IdentityDocuments     services.IdentityDocuments
 	DocumentExtractor     services.DocumentExtractor
 	AIService             *ai.Service
+	TenantConfig          TenantConfigReader
 	AdminUsername         string
 	AdminPassword         string
 	ServerName            string
@@ -149,7 +150,7 @@ func NewHandler(cfg Config) http.Handler {
 		mux.Handle("/v1/assets/categories", authMiddleware(cfg)(assetCategoriesHandler(cfg)))
 	}
 
-	return loggingMiddleware(cfg.Logger)(mux)
+	return loggingMiddleware(cfg.Logger)(corsMiddleware(cfg.TenantConfig)(mux))
 }
 
 type versionResponse struct {

@@ -49,8 +49,25 @@ type Tenant struct {
 	ID        primitive.ObjectID `bson:"_id"`
 	Slug      string             `bson:"slug"`
 	Name      string             `bson:"name"`
+	Config    TenantConfig       `bson:"config"`
 	CreatedAt time.Time          `bson:"createdAt"`
 	UpdatedAt time.Time          `bson:"updatedAt"`
+}
+
+// TenantConfig holds per-tenant integration settings shared across consuming
+// apps. Extended as the aqd enablement track lands: CORS origins now (Part B),
+// external-IdP config for browser-safe auth next (Part C).
+type TenantConfig struct {
+	AllowedOrigins []string    `bson:"allowedOrigins,omitempty" json:"allowed_origins,omitempty"`
+	OIDC           *TenantOIDC `bson:"oidc,omitempty" json:"oidc,omitempty"`
+}
+
+// TenantOIDC configures external-IdP bearer verification for browser-only
+// tenants (reserved for aqd Part C — declared here, not yet enforced).
+type TenantOIDC struct {
+	Issuer   string `bson:"issuer" json:"issuer"`
+	Audience string `bson:"audience" json:"audience"`
+	JWKSURL  string `bson:"jwksUrl" json:"jwks_url"`
 }
 
 // APIKey represents an API key record stored for a tenant.

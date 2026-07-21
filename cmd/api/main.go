@@ -137,6 +137,7 @@ func main() {
 		IdentityDocuments:     identityDocumentService,
 		DocumentExtractor:     docExtractor,
 		AIService:             aiService,
+		TenantConfig:          mongoStore,
 		AdminUsername:         os.Getenv("KD_ADMIN_USERNAME"),
 		AdminPassword:         os.Getenv("KD_ADMIN_PASSWORD"),
 		ServerName:            os.Getenv("KD_SERVER_NAME"),

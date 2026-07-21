@@ -12,6 +12,7 @@ type AdminStore interface {
 	ListTenants(ctx context.Context) ([]store.Tenant, error)
 	CreateTenant(ctx context.Context, input store.CreateTenantInput) (*store.Tenant, error)
 	UpdateTenantName(ctx context.Context, tenantSlug, name string) (*store.Tenant, error)
+	SetTenantAllowedOrigins(ctx context.Context, tenantSlug string, origins []string) (*store.Tenant, error)
 	IssueAPIKey(ctx context.Context, tenantSlug, label string) (*store.IssuedAPIKey, error)
 	RevokeAPIKey(ctx context.Context, tenantID, keyID string) error
 }
@@ -23,9 +24,19 @@ type AdminService struct {
 
 // TenantSummary is the public tenant administration view.
 type TenantSummary struct {
-	Slug      string    `json:"slug"`
-	Name      string    `json:"name"`
-	CreatedAt time.Time `json:"created_at"`
+	Slug           string    `json:"slug"`
+	Name           string    `json:"name"`
+	AllowedOrigins []string  `json:"allowed_origins,omitempty"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+func tenantSummary(t *store.Tenant) TenantSummary {
+	return TenantSummary{
+		Slug:           t.Slug,
+		Name:           t.Name,
+		AllowedOrigins: t.Config.AllowedOrigins,
+		CreatedAt:      t.CreatedAt,
+	}
 }
 
 // IssuedCredential contains a newly issued secret, returned only once.
@@ -49,12 +60,8 @@ func (s *AdminService) ListTenants(ctx context.Context) ([]TenantSummary, error)
 	}
 
 	result := make([]TenantSummary, 0, len(tenants))
-	for _, tenant := range tenants {
-		result = append(result, TenantSummary{
-			Slug:      tenant.Slug,
-			Name:      tenant.Name,
-			CreatedAt: tenant.CreatedAt,
-		})
+	for i := range tenants {
+		result = append(result, tenantSummary(&tenants[i]))
 	}
 	return result, nil
 }
@@ -65,7 +72,8 @@ func (s *AdminService) CreateTenant(ctx context.Context, slug, name string) (*Te
 	if err != nil {
 		return nil, err
 	}
-	return &TenantSummary{Slug: tenant.Slug, Name: tenant.Name, CreatedAt: tenant.CreatedAt}, nil
+	summary := tenantSummary(tenant)
+	return &summary, nil
 }
 
 // UpdateTenantName changes a tenant's display name.
@@ -74,7 +82,18 @@ func (s *AdminService) UpdateTenantName(ctx context.Context, slug, name string) 
 	if err != nil {
 		return nil, err
 	}
-	return &TenantSummary{Slug: tenant.Slug, Name: tenant.Name, CreatedAt: tenant.CreatedAt}, nil
+	summary := tenantSummary(tenant)
+	return &summary, nil
+}
+
+// SetTenantAllowedOrigins replaces a tenant's CORS origin allowlist (aqd Part B).
+func (s *AdminService) SetTenantAllowedOrigins(ctx context.Context, slug string, origins []string) (*TenantSummary, error) {
+	tenant, err := s.store.SetTenantAllowedOrigins(ctx, slug, origins)
+	if err != nil {
+		return nil, err
+	}
+	summary := tenantSummary(tenant)
+	return &summary, nil
 }
 
 // IssueAPIKey issues a tenant credential.

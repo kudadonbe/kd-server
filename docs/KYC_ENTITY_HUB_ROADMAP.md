@@ -5,7 +5,7 @@ Tracks the work that turns kd-server into a shared KYC/entity hub for many apps
 land. **One PR = one part.** Keep this file updated when a part completes.
 
 - **Status legend:** `[ ]` todo · `[x]` done · `[~]` in progress
-- **Last updated:** 2026-07-16 · Phase 1 shipped; Part A implemented (pending test/commit); smart-intake ladder + trust model added
+- **Last updated:** 2026-07-21 · Phase 1 + Part A shipped; Part B (tenant-config + CORS) implemented & verified; Part C next
 - **Build notes for the aqd consumer flow (extract → prefill KYC):** `AQD_KYC_INTEGRATION.md`
 
 ## Why
@@ -110,11 +110,18 @@ manual test (sample cards only, never a real document).
 - [ ] OpenAPI contract for the route
 - [ ] `extract.rest` owner test with a sample card
 
-**Part B — CORS for browser tenants**
-- [ ] Per-tenant allowed-origins in tenant config (Mongo), editable in admin console
-- [ ] CORS middleware on `/v1/*`: answer `OPTIONS` preflight; allow `GET, POST`,
-      headers `Authorization, X-KD-Tenant, Content-Type`; echo only allowlisted
-      origins; `Vary: Origin`; no wildcard `*`
+**Part B — CORS for browser tenants**  `[~]` (verified live; admin UI form deferred)
+- [x] Tenant-config foundation: `Tenant.Config` sub-document (`store.TenantConfig`
+      — CORS origins now, OIDC reserved for Part C); store read/write
+      (`TenantAllowedOrigins`, `OriginRegistered`, `SetTenantAllowedOrigins`)
+- [x] Per-tenant allowed-origins editable via admin API
+      (`POST /admin/api/tenants/origins`); shown in tenant summary.
+      *(HTMX form in the console UI still to add — API-only for now.)*
+- [x] CORS middleware on `/v1/*`: `OPTIONS` preflight answered from the global
+      origin set (preflight has no tenant header); actual request validated
+      per-tenant; allow `GET, POST`, headers `Authorization, X-KD-Tenant,
+      Content-Type`; echo only allowlisted origins; `Vary: Origin`; no wildcard.
+      Runs before `authMiddleware`. Verified live (allowed/disallowed × preflight/actual)
 
 **Part C — Browser-safe auth (mode 1: external IdP)**  (Phase 2)
 - [ ] Tenant config: OIDC issuer + audience + JWKS URL (aqd = Firebase

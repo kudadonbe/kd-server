@@ -650,6 +650,11 @@ func (s *stubAdminStore) UpdateTenantName(_ context.Context, slug, name string) 
 	return &store.Tenant{Slug: slug, Name: name, CreatedAt: time.Now()}, nil
 }
 
+func (s *stubAdminStore) SetTenantAllowedOrigins(_ context.Context, slug string, origins []string) (*store.Tenant, error) {
+	s.lastSlug = slug
+	return &store.Tenant{Slug: slug, Config: store.TenantConfig{AllowedOrigins: origins}, CreatedAt: time.Now()}, nil
+}
+
 func (s *stubAdminStore) IssueAPIKey(context.Context, string, string) (*store.IssuedAPIKey, error) {
 	return nil, errors.New("not implemented")
 }
