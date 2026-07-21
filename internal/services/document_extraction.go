@@ -50,8 +50,11 @@ type DocumentExtraction struct {
 }
 
 // DocumentExtractor extracts reviewable fields from identity-document files.
+// tenantID scopes AI-credential resolution (per-tenant key, then server default);
+// an empty tenantID resolves the server default only. Extraction is always
+// suggestion-only — nothing is stored.
 type DocumentExtractor interface {
-	Extract(ctx context.Context, filename, contentType string, source io.Reader) (*DocumentExtraction, error)
+	Extract(ctx context.Context, tenantID, filename, contentType string, source io.Reader) (*DocumentExtraction, error)
 }
 
 // LocalDocumentExtractor runs local Tesseract and Poppler processes.
@@ -119,7 +122,9 @@ func NewLocalDocumentExtractor() (*LocalDocumentExtractor, error) {
 }
 
 // Extract processes one uploaded file in a disposable directory.
-func (e *LocalDocumentExtractor) Extract(ctx context.Context, filename, contentType string, source io.Reader) (*DocumentExtraction, error) {
+// Extract runs local OCR. The tenantID argument is ignored — OCR uses no AI
+// credentials.
+func (e *LocalDocumentExtractor) Extract(ctx context.Context, _, filename, contentType string, source io.Reader) (*DocumentExtraction, error) {
 	if e == nil || e.tesseract == "" {
 		return nil, errors.New("services: document extractor not configured")
 	}

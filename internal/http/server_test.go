@@ -599,11 +599,13 @@ type stubIdentityDocuments struct {
 type stubDocumentExtractor struct {
 	result      *services.DocumentExtraction
 	err         error
+	tenant      string
 	filename    string
 	contentType string
 }
 
-func (s *stubDocumentExtractor) Extract(_ context.Context, filename, contentType string, source io.Reader) (*services.DocumentExtraction, error) {
+func (s *stubDocumentExtractor) Extract(_ context.Context, tenantID, filename, contentType string, source io.Reader) (*services.DocumentExtraction, error) {
+	s.tenant = tenantID
 	s.filename = filename
 	s.contentType = contentType
 	_, _ = io.ReadAll(source)

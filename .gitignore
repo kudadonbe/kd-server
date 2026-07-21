@@ -30,6 +30,7 @@ test.rest
 ai.rest
 pem.rest
 search.rest
+extract.rest
 /tmp/*
 
 # Logs

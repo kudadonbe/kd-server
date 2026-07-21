@@ -31,7 +31,7 @@ type stubFallback struct {
 	called bool
 }
 
-func (s *stubFallback) Extract(_ context.Context, _, _ string, source io.Reader) (*DocumentExtraction, error) {
+func (s *stubFallback) Extract(_ context.Context, _, _, _ string, source io.Reader) (*DocumentExtraction, error) {
 	s.called = true
 	_, _ = io.ReadAll(source)
 	return s.result, nil
@@ -56,7 +56,7 @@ func TestAIDocumentExtractorMapsFields(t *testing.T) {
 	fallback := &stubFallback{}
 	extractor := NewAIDocumentExtractor(aiStub, fallback)
 
-	doc, err := extractor.Extract(context.Background(), "card.jpg", "image/jpeg", strings.NewReader("fake-bytes"))
+	doc, err := extractor.Extract(context.Background(), "", "card.jpg", "image/jpeg", strings.NewReader("fake-bytes"))
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -90,7 +90,7 @@ func TestAIDocumentExtractorFallsBackWhenNotConfigured(t *testing.T) {
 	fallback := &stubFallback{result: &DocumentExtraction{Engine: "tesseract-5"}}
 	extractor := NewAIDocumentExtractor(aiStub, fallback)
 
-	doc, err := extractor.Extract(context.Background(), "card.jpg", "image/jpeg", strings.NewReader("bytes"))
+	doc, err := extractor.Extract(context.Background(), "", "card.jpg", "image/jpeg", strings.NewReader("bytes"))
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -109,7 +109,7 @@ func TestAIDocumentExtractorFallsBackOnAIError(t *testing.T) {
 	fallback := &stubFallback{result: &DocumentExtraction{Engine: "tesseract-5"}}
 	extractor := NewAIDocumentExtractor(aiStub, fallback)
 
-	doc, err := extractor.Extract(context.Background(), "card.jpg", "image/jpeg", strings.NewReader("bytes"))
+	doc, err := extractor.Extract(context.Background(), "", "card.jpg", "image/jpeg", strings.NewReader("bytes"))
 	if err != nil {
 		t.Fatalf("extract: %v", err)
 	}
@@ -124,7 +124,7 @@ func TestAIDocumentExtractorErrorsWithoutFallback(t *testing.T) {
 	aiStub := &stubAIExtractor{err: errors.New("provider timeout")}
 	extractor := NewAIDocumentExtractor(aiStub, nil)
 
-	if _, err := extractor.Extract(context.Background(), "card.jpg", "image/jpeg", strings.NewReader("bytes")); err == nil {
+	if _, err := extractor.Extract(context.Background(), "", "card.jpg", "image/jpeg", strings.NewReader("bytes")); err == nil {
 		t.Fatal("expected error when AI fails and no fallback exists")
 	}
 }

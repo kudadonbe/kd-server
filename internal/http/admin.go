@@ -166,6 +166,7 @@ func adminAPIHandler(cfg Config, adminAuth *adminAuthenticator) http.Handler {
 
 			extraction, err := cfg.DocumentExtractor.Extract(
 				r.Context(),
+				"", // admin console uses the server-default AI key
 				filepath.Base(header.Filename),
 				contentType,
 				io.MultiReader(bytes.NewReader(prefix), file),

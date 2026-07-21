@@ -110,6 +110,12 @@ func NewHandler(cfg Config) http.Handler {
 		mux.Handle("/v1/search", authMiddleware(cfg)(searchHandler(cfg)))
 	}
 
+	// Tenant-facing identity-document extraction (suggestion-only; nothing
+	// stored). Registered only when a document extractor is wired.
+	if cfg.DocumentExtractor != nil {
+		mux.Handle("/v1/identity-documents/extract", authMiddleware(cfg)(identityDocumentExtractHandler(cfg)))
+	}
+
 	// Shared AI credential management (tenant brings its own key). Registered
 	// only when the AI service is configured (AI_ENCRYPTION_KEY set).
 	if cfg.AIService != nil {

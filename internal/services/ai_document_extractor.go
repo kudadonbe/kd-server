@@ -58,8 +58,10 @@ func NewAIDocumentExtractor(aiExtractor AIExtractor, fallback DocumentExtractor)
 	return &AIDocumentExtractor{ai: aiExtractor, fallback: fallback}
 }
 
-// Extract runs the vision model first, then OCR as a fallback.
-func (e *AIDocumentExtractor) Extract(ctx context.Context, filename, contentType string, source io.Reader) (*DocumentExtraction, error) {
+// Extract runs the vision model first, then OCR as a fallback. tenantID selects
+// the tenant's AI credential (falling back to the server default); an empty
+// tenantID resolves the server default only.
+func (e *AIDocumentExtractor) Extract(ctx context.Context, tenantID, filename, contentType string, source io.Reader) (*DocumentExtraction, error) {
 	data, err := io.ReadAll(source)
 	if err != nil {
 		return nil, fmt.Errorf("services: read document: %w", err)
@@ -67,7 +69,7 @@ func (e *AIDocumentExtractor) Extract(ctx context.Context, filename, contentType
 
 	var aiErr error
 	if e.ai != nil && len(data) <= maxAIDocumentBytes {
-		result, err := e.ai.Extract(ctx, "", ai.ExtractionRequest{
+		result, err := e.ai.Extract(ctx, tenantID, ai.ExtractionRequest{
 			MediaType:   normalizeDocumentMediaType(contentType, filename),
 			Data:        data,
 			Instruction: identityInstruction,
@@ -80,7 +82,7 @@ func (e *AIDocumentExtractor) Extract(ctx context.Context, filename, contentType
 	}
 
 	if e.fallback != nil {
-		return e.fallback.Extract(ctx, filename, contentType, bytes.NewReader(data))
+		return e.fallback.Extract(ctx, tenantID, filename, contentType, bytes.NewReader(data))
 	}
 	if aiErr != nil && !errors.Is(aiErr, ai.ErrNotConfigured) {
 		return nil, aiErr
