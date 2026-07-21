@@ -5,7 +5,7 @@ Tracks the work that turns kd-server into a shared KYC/entity hub for many apps
 land. **One PR = one part.** Keep this file updated when a part completes.
 
 - **Status legend:** `[ ]` todo · `[x]` done · `[~]` in progress
-- **Last updated:** 2026-07-15
+- **Last updated:** 2026-07-16 · Phase 1 shipped; Part A implemented (pending test/commit); smart-intake ladder + trust model added
 - **Build notes for the aqd consumer flow (extract → prefill KYC):** `AQD_KYC_INTEGRATION.md`
 
 ## Why
@@ -86,6 +86,100 @@ a scoped session token on top of the app's API key.
 
 - [ ] `POST /v1/identity-documents/{id}/verify` — promotes to verified, records authenticated actor as `verified_by`
 - [ ] Gated by `verify` scope
+
+---
+
+## aqd enablement track (Parts A–D)  `[ ]`
+
+Implementation-ordered slice of Phases 2–4, driven by **aqd** (static browser
+app, Firebase Hosting). Detailed in `AQD_KYC_INTEGRATION.md`. Build order
+**A → B → C(mode 1) → D** unblocks aqd end-to-end. One PR per part; each ends
+green (`make fmt lint test`), ticks its box, and ships an `extract.rest`-style
+manual test (sample cards only, never a real document).
+
+**Part A — Tenant-facing extract endpoint**  (Phase 3, first checkbox)  `[~]`
+- [x] Thread tenant into extraction: `DocumentExtractor.Extract` takes `tenantID`
+      (was hardcoded `""`); updated `AIDocumentExtractor` (→ `ai.Extract`),
+      `LocalDocumentExtractor` (ignores it), admin call site, existing test stubs
+- [x] `POST /v1/identity-documents/extract` — mirror admin extract behind
+      `authMiddleware`; multipart `document`, 10 MB, PDF/JPEG/PNG sniff, `422`
+      on failure, `Cache-Control: no-store`; tenant from context; extract-only
+      (no lookup, no save, no raw-text persistence)
+- [x] Nil-guarded route wiring on `cfg.DocumentExtractor`
+- [ ] Per-tenant rate limit (token bucket, `429` + `Retry-After`); per-user in Part C
+- [ ] OpenAPI contract for the route
+- [ ] `extract.rest` owner test with a sample card
+
+**Part B — CORS for browser tenants**
+- [ ] Per-tenant allowed-origins in tenant config (Mongo), editable in admin console
+- [ ] CORS middleware on `/v1/*`: answer `OPTIONS` preflight; allow `GET, POST`,
+      headers `Authorization, X-KD-Tenant, Content-Type`; echo only allowlisted
+      origins; `Vary: Origin`; no wildcard `*`
+
+**Part C — Browser-safe auth (mode 1: external IdP)**  (Phase 2)
+- [ ] Tenant config: OIDC issuer + audience + JWKS URL (aqd = Firebase
+      `securetoken.google.com/aqd-fc`, RS256)
+- [ ] `authMiddleware` second path: verify tenant-IdP token → restricted scope
+      set (start `extract` only); end-user `sub`/`email` → rate-limit key + audit actor
+- [ ] Scope-enforcement layer (routes check scopes only: `extract`,
+      `search:read`, `records:write`, `verify`), covering API-key + JWT + IdP modes
+- [ ] (Later) mode 2 token exchange for tenants that have their own backend
+
+**Part D — Finalize & verify**  (Phases 3–4)
+- [ ] Normalize + validate → structured per-field errors (national ID, sex enum,
+      ISO dates, names/address)
+- [ ] Finalize: resolve-or-create person → versioned, audited identity document;
+      server owns `verification_status` (default unverified) + `field_confidence`;
+      gated `records:write`
+- [ ] `POST /v1/identity-documents/{id}/verify` (scope `verify`) records `verified_by`
+
+**Confirmed trust model** (2026-07-16)
+- **Verification is by an authorized person only** — a privileged role. Clients
+  can never self-assert `verified`; the server owns `verification_status`.
+- **User edits/updates are saved but tagged** `unverified` (user-asserted):
+  searchable, but labeled unconfirmed until an authorized person promotes them.
+- Search-first treats **verified** records as authoritative; unverified matches
+  may be offered but must be labeled.
+
+---
+
+## Living source of truth — smart intake ladder  `[ ]`
+
+Goal: kd-server holds the current, verified identity data; every app's reviewed
+corrections flow back so the next lookup is cheaper and better. Extraction spend
+trends toward zero as the DB fills.
+
+**Intake ladder (cheap → expensive):**
+```
+image → OCR (tesseract, free/local) → got searchable id (national_id ±dob)?
+          ├─ yes → search kd-server → verified match? → RETURN it (no AI)
+          │                            └─ no match ─────────────┐
+          └─ no/blank ──────────────────────────────────────────► AI vision extract → return (fresh, unverified)
+```
+- [ ] Intake orchestrator service (composes OCR probe + `/v1/search` + AI extract);
+      keep it ABOVE the extractor primitives, not inside them
+- [ ] OCR probe hardening: validate national-ID **format** + **confidence-gate**
+      before trusting a Tesseract read for the DB shortcut (avoid wrong-person match)
+- [ ] Response marks provenance: `source: kd-server(verified) | ai(unverified)`,
+      always presented as "is this you?" — never auto-accept
+- [ ] Save only on user review+save (keeps unconfirmed AI guesses out of the DB)
+- [ ] **Privacy scope (confirmed 2026-07-16, depends on Part C):** all search —
+      including image→search return — requires an **authenticated end-user**
+      identity (from any consuming app), never anonymous or a bare tenant key.
+      Result **breadth follows the user's role/scope**: self-KYC users get only
+      their own record; staff with `search:read` may search across people. The
+      end-user identity is the audit actor + rate-limit key (a leaked token must
+      not allow bulk PII pulls).
+- [ ] (If cards carry an MRZ) add an MRZ reader as an even cheaper/reliable probe
+
+**Revised build order:** A (done) → C (auth/scope) → D (save+verify) → intake
+ladder → B (CORS, when the browser path is needed). The ladder is only worth
+building once there is verified data to hit and auth to scope it.
+
+**OCR choice:** Tesseract 5 stays for the free local probe (national ID is Latin,
+reads fine; no image leaves the server; zero cost). It is weak on Thaana and on
+phone photos — so AI owns full extraction, and the probe is format+confidence
+gated. No cloud OCR (adds a data processor + cost for little Thaana gain).
 
 ---
 

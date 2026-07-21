@@ -6,7 +6,9 @@
 - **AssetMngPolicyMaldives.pdf** - Official IPSAS 17 policy from Ministry of Finance
 
 ## Client Integration
+- **[API_USAGE.md](./API_USAGE.md)** - Practical `/v1` API reference for consuming apps (auth, search, extract, pipeline)
 - **CLIENT_INTEGRATION_GUIDE.md** - Guide for integrating client apps with KD-Server API
+- **AQD_KYC_INTEGRATION.md** - What kd-server must provide so aqd can use ID-card extraction
 - **IDENTITY_DOCUMENTS.md** - Maldivian identity-document fields, tracing, and security rules
 - **CLIENT_UI_BUILD_GUIDE.md** - UI building guidelines
 
