@@ -5,7 +5,7 @@ Tracks the work that turns kd-server into a shared KYC/entity hub for many apps
 land. **One PR = one part.** Keep this file updated when a part completes.
 
 - **Status legend:** `[ ]` todo · `[x]` done · `[~]` in progress
-- **Last updated:** 2026-07-21 · Phase 1 + Parts A/B shipped; Part C (scope model + tenant OIDC + JWKS/RS256 IdP auth) implemented & verified live; Part D next
+- **Last updated:** 2026-07-21 · Phase 1 + Parts A/B/C/D implemented & verified live (extract → finalize → search → verify). aqd core flow complete; follow-ups: /v1/me self-reveal, rate-limit, admin UI forms, real-IdP owner test
 - **Build notes for the aqd consumer flow (extract → prefill KYC):** `AQD_KYC_INTEGRATION.md`
 
 ## Why
@@ -170,13 +170,16 @@ manual test (sample cards only, never a real document).
 - [ ] KBA is **not** a reveal gate (weak vs the FC known-adversary threat); any
       user-supplied confirming data feeds the **staff verification** queue instead.
 
-**Part D — Finalize & verify**  (Phases 3–4)
-- [ ] Normalize + validate → structured per-field errors (national ID, sex enum,
-      ISO dates, names/address)
-- [ ] Finalize: resolve-or-create person → versioned, audited identity document;
-      server owns `verification_status` (default unverified) + `field_confidence`;
-      gated `records:write`
-- [ ] `POST /v1/identity-documents/{id}/verify` (scope `verify`) records `verified_by`
+**Part D — Finalize & verify**  (Phases 3–4)  `[~]`
+- [x] Normalize + validate → structured per-field errors (national ID, sex M/F,
+      ISO dates) — `services.ValidationError` → HTTP 400 `{error, fields[]}`
+- [x] Finalize `POST /v1/identity-documents`: resolve-or-create person
+      (national ID + optional phone) → versioned, audited identity document;
+      server forces `verification_status=unverified`; gated `records:write`
+- [x] `POST /v1/identity-documents/{id}/verify` (scope `verify`) → verified,
+      records `verified_by`, new version. Verified live: finalize→unverified,
+      search finds name(20), bad sex/date→400 fields, verify→verified v2.
+- [ ] Owner test via `.rest`; `field_confidence` passthrough is a follow-up
 
 **Confirmed trust model** (2026-07-16)
 - **Verification is by an authorized person only** — a privileged role. Clients

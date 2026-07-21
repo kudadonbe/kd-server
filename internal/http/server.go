@@ -31,6 +31,7 @@ type Config struct {
 	ClassificationService *services.ClassificationService
 	AdminService          *services.AdminService
 	IdentityDocuments     services.IdentityDocuments
+	IdentityFinalize      IdentityFinalizer
 	DocumentExtractor     services.DocumentExtractor
 	AIService             *ai.Service
 	TenantConfig          TenantConfigReader
@@ -116,6 +117,13 @@ func NewHandler(cfg Config) http.Handler {
 	// stored). Registered only when a document extractor is wired.
 	if cfg.DocumentExtractor != nil {
 		mux.Handle("/v1/identity-documents/extract", authMiddleware(cfg)(requireScope(ScopeExtract)(identityDocumentExtractHandler(cfg))))
+	}
+
+	// Identity-document finalize (save reviewed extraction, unverified) and
+	// verify (authorized promotion). Registered only when the service is wired.
+	if cfg.IdentityFinalize != nil {
+		mux.Handle("POST /v1/identity-documents", authMiddleware(cfg)(requireScope(ScopeRecordsWrite)(identityDocumentFinalizeHandler(cfg))))
+		mux.Handle("POST /v1/identity-documents/{id}/verify", authMiddleware(cfg)(requireScope(ScopeVerify)(identityDocumentVerifyHandler(cfg))))
 	}
 
 	// Shared AI credential management (tenant brings its own key). Registered

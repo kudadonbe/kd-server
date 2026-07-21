@@ -126,3 +126,32 @@ func (s *MongoStore) SaveIdentityDocument(ctx context.Context, document Identity
 	s.rebuildEntityIndexBestEffort(ctx, document.TenantID, document.PersonID)
 	return &document, nil
 }
+
+// VerifyIdentityDocument promotes a document to verified, recording the actor,
+// and versions the change through SaveIdentityDocument (history + reindex).
+func (s *MongoStore) VerifyIdentityDocument(ctx context.Context, tenantID, documentID, verifiedBy string) (*IdentityDocument, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("store: mongo not configured")
+	}
+	tenantID = strings.TrimSpace(tenantID)
+	documentID = strings.TrimSpace(documentID)
+	if tenantID == "" || documentID == "" {
+		return nil, errors.New("store: tenant and document ID are required")
+	}
+
+	var doc IdentityDocument
+	err := s.db.Collection("identity_documents").FindOne(ctx, bson.M{
+		"tenantId":   tenantID,
+		"documentId": documentID,
+	}).Decode(&doc)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, errors.New("store: identity document not found")
+		}
+		return nil, fmt.Errorf("store: find identity document: %w", err)
+	}
+
+	doc.VerificationStatus = "verified"
+	doc.VerifiedBy = strings.TrimSpace(verifiedBy)
+	return s.SaveIdentityDocument(ctx, doc, verifiedBy)
+}

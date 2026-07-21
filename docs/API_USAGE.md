@@ -147,17 +147,37 @@ Content-Type: multipart/form-data      // field "document", ≤10MB, PDF/JPEG/PN
 
 ---
 
-## Identity-document finalize & verify  **(planned — aqd Part D)**
+## Identity-document finalize & verify
 
 The write path that makes kd-server the source of truth. Extraction is
 suggestion-only; saving is a separate, reviewed step.
 
-- `POST /v1/identity-documents` — resolve-or-create person, save a **versioned**
-  identity document. Stored **tagged `unverified`** (user-asserted); the server
-  owns `verification_status` — a client cannot self-assert verified.
-- `POST /v1/identity-documents/{id}/verify` — **authorized role only**; promotes
-  to `verified` and records `verified_by`. This is what search-first treats as
-  authoritative.
+```
+POST /v1/identity-documents         (scope: records:write)
+{
+  "national_id": "A123456",
+  "name":        {"english":"…","dhivehi":"…"},
+  "common_name": {"english":"…","dhivehi":"…"},
+  "sex": "M", "date_of_birth": "1990-01-01",
+  "address": {"house":{"english":"…","dhivehi":"…"},
+              "island":{"english":"…","dhivehi":"…"}},
+  "expiry_date":"…","serial_number":"…",
+  "phone": "+960…"        // optional, only used to resolve-or-create the person
+}
+→ 200  the saved document (person resolved-or-created; version 1;
+        verification_status forced to "unverified")
+→ 400  {"error":"validation failed","fields":[{"field":"sex","message":"must be M or F"}]}
+```
+The server owns `verification_status` — a client **cannot** self-assert verified.
+
+```
+POST /v1/identity-documents/{id}/verify   (scope: verify — authorized role only)
+→ 200  the document, verification_status "verified", verified_by set, version bumped
+```
+This is what search-first treats as authoritative.
+
+**Scopes:** browser (IdP) callers get `extract` by default; `records:write` and
+`verify` require a staff/admin role claim or a trusted server-side (API-key) caller.
 
 ---
 

@@ -2,10 +2,23 @@ package http
 
 import (
 	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"path/filepath"
+
+	"github.com/kudadonbe/kd-server/internal/services"
+	"github.com/kudadonbe/kd-server/internal/store"
 )
+
+// IdentityFinalizer saves reviewed extraction as a versioned identity document
+// and promotes a document to verified.
+type IdentityFinalizer interface {
+	Finalize(ctx context.Context, tenantID, actor, phone string, doc store.IdentityDocument) (*store.IdentityDocument, error)
+	Verify(ctx context.Context, tenantID, documentID, actor string) (*store.IdentityDocument, error)
+}
 
 // identityDocumentExtractHandler serves POST /v1/identity-documents/extract — a
 // tenant-facing mirror of the admin extract. It reads an uploaded identity
@@ -72,4 +85,84 @@ func identityDocumentExtractHandler(cfg Config) http.Handler {
 		w.Header().Set("Cache-Control", "no-store")
 		writeJSON(w, http.StatusOK, extraction)
 	})
+}
+
+// finalizeRequest is the reviewed identity document to save. It is the document
+// shape plus an optional phone used only to resolve-or-create the person.
+type finalizeRequest struct {
+	store.IdentityDocument
+	Phone string `json:"phone,omitempty"`
+}
+
+// identityDocumentFinalizeHandler serves POST /v1/identity-documents — save a
+// reviewed identity document (resolve-or-create person, stored unverified).
+// Gated by records:write. The server owns verification_status.
+func identityDocumentFinalizeHandler(cfg Config) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+			return
+		}
+		tenantID, ok := TenantFromContext(r.Context())
+		if !ok {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "tenant context missing"})
+			return
+		}
+
+		var req finalizeRequest
+		decoder := json.NewDecoder(r.Body)
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid payload"})
+			return
+		}
+
+		saved, err := cfg.IdentityFinalize.Finalize(r.Context(), tenantID, actorFromContext(r.Context()), req.Phone, req.IdentityDocument)
+		if err != nil {
+			var verr *services.ValidationError
+			if errors.As(err, &verr) {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "validation failed", "fields": verr.Errors})
+				return
+			}
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "finalize failed"})
+			return
+		}
+		writeJSON(w, http.StatusOK, saved)
+	})
+}
+
+// identityDocumentVerifyHandler serves POST /v1/identity-documents/{id}/verify —
+// promote a document to verified, recording the authorized actor. Gated by the
+// verify scope.
+func identityDocumentVerifyHandler(cfg Config) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+			return
+		}
+		tenantID, ok := TenantFromContext(r.Context())
+		if !ok {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "tenant context missing"})
+			return
+		}
+		documentID := r.PathValue("id")
+		saved, err := cfg.IdentityFinalize.Verify(r.Context(), tenantID, documentID, actorFromContext(r.Context()))
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, saved)
+	})
+}
+
+// actorFromContext returns the audit actor for the request (the principal's
+// subject — API key id or end-user sub), falling back to the auth mode.
+func actorFromContext(ctx context.Context) string {
+	if p, ok := PrincipalFromContext(ctx); ok {
+		if p.Subject != "" {
+			return p.Subject
+		}
+		return string(p.Mode)
+	}
+	return ""
 }
