@@ -13,6 +13,7 @@ type AdminStore interface {
 	CreateTenant(ctx context.Context, input store.CreateTenantInput) (*store.Tenant, error)
 	UpdateTenantName(ctx context.Context, tenantSlug, name string) (*store.Tenant, error)
 	SetTenantAllowedOrigins(ctx context.Context, tenantSlug string, origins []string) (*store.Tenant, error)
+	SetTenantOIDCProviders(ctx context.Context, tenantSlug string, providers []store.OIDCProvider) (*store.Tenant, error)
 	IssueAPIKey(ctx context.Context, tenantSlug, label string) (*store.IssuedAPIKey, error)
 	RevokeAPIKey(ctx context.Context, tenantID, keyID string) error
 }
@@ -24,10 +25,11 @@ type AdminService struct {
 
 // TenantSummary is the public tenant administration view.
 type TenantSummary struct {
-	Slug           string    `json:"slug"`
-	Name           string    `json:"name"`
-	AllowedOrigins []string  `json:"allowed_origins,omitempty"`
-	CreatedAt      time.Time `json:"created_at"`
+	Slug           string               `json:"slug"`
+	Name           string               `json:"name"`
+	AllowedOrigins []string             `json:"allowed_origins,omitempty"`
+	OIDCProviders  []store.OIDCProvider `json:"oidc_providers,omitempty"`
+	CreatedAt      time.Time            `json:"created_at"`
 }
 
 func tenantSummary(t *store.Tenant) TenantSummary {
@@ -35,6 +37,7 @@ func tenantSummary(t *store.Tenant) TenantSummary {
 		Slug:           t.Slug,
 		Name:           t.Name,
 		AllowedOrigins: t.Config.AllowedOrigins,
+		OIDCProviders:  t.Config.OIDCProviders,
 		CreatedAt:      t.CreatedAt,
 	}
 }
@@ -89,6 +92,17 @@ func (s *AdminService) UpdateTenantName(ctx context.Context, slug, name string) 
 // SetTenantAllowedOrigins replaces a tenant's CORS origin allowlist (aqd Part B).
 func (s *AdminService) SetTenantAllowedOrigins(ctx context.Context, slug string, origins []string) (*TenantSummary, error) {
 	tenant, err := s.store.SetTenantAllowedOrigins(ctx, slug, origins)
+	if err != nil {
+		return nil, err
+	}
+	summary := tenantSummary(tenant)
+	return &summary, nil
+}
+
+// SetTenantOIDCProviders replaces a tenant's external-IdP provider list (aqd
+// Part C). Pass an empty list to clear them.
+func (s *AdminService) SetTenantOIDCProviders(ctx context.Context, slug string, providers []store.OIDCProvider) (*TenantSummary, error) {
+	tenant, err := s.store.SetTenantOIDCProviders(ctx, slug, providers)
 	if err != nil {
 		return nil, err
 	}

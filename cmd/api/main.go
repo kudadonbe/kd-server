@@ -126,6 +126,7 @@ func main() {
 		VersionService:        versionService,
 		AuthVerifier:          authVerifier,
 		APIKeyVerifier:        mongoStore,
+		OIDCVerifier:          auth.NewJWKSVerifier(),
 		IngestService:         ingestService,
 		ResolveService:        resolveService,
 		LookupService:         lookupService,

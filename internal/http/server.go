@@ -20,6 +20,7 @@ type Config struct {
 	VersionService        services.VersionProvider
 	AuthVerifier          auth.Verifier
 	APIKeyVerifier        auth.APIKeyVerifier
+	OIDCVerifier          auth.OIDCVerifier
 	TenantHeader          string
 	IngestService         services.Ingestor
 	ResolveService        services.Resolver
@@ -107,14 +108,14 @@ func NewHandler(cfg Config) http.Handler {
 	// Multi-signal entity search (shared across apps). Optional: registered only
 	// when a search service is wired.
 	if cfg.SearchService != nil {
-		mux.Handle("/v1/search/reindex", authMiddleware(cfg)(reindexHandler(cfg)))
-		mux.Handle("/v1/search", authMiddleware(cfg)(searchHandler(cfg)))
+		mux.Handle("/v1/search/reindex", authMiddleware(cfg)(requireScope(ScopeSearchRead)(reindexHandler(cfg))))
+		mux.Handle("/v1/search", authMiddleware(cfg)(requireScope(ScopeSearchRead)(searchHandler(cfg))))
 	}
 
 	// Tenant-facing identity-document extraction (suggestion-only; nothing
 	// stored). Registered only when a document extractor is wired.
 	if cfg.DocumentExtractor != nil {
-		mux.Handle("/v1/identity-documents/extract", authMiddleware(cfg)(identityDocumentExtractHandler(cfg)))
+		mux.Handle("/v1/identity-documents/extract", authMiddleware(cfg)(requireScope(ScopeExtract)(identityDocumentExtractHandler(cfg))))
 	}
 
 	// Shared AI credential management (tenant brings its own key). Registered
@@ -230,9 +231,34 @@ func authMiddleware(cfg Config) func(http.Handler) http.Handler {
 					return
 				}
 
-				ctx := ContextWithTenant(r.Context(), tenantID)
+				keyID, _, _ := strings.Cut(token, ".")
+				ctx := ContextWithPrincipal(r.Context(), &Principal{
+					TenantID: tenantID,
+					Subject:  keyID,
+					Mode:     AuthModeAPIKey,
+					Scopes:   trustedScopes(),
+				})
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
+			}
+
+			// External-IdP (browser) path: an RS256 token whose issuer matches one
+			// of the tenant's configured providers. HS256 falls through to the
+			// kd-server JWT verifier below.
+			if cfg.OIDCVerifier != nil && cfg.TenantConfig != nil {
+				if issuer, alg, perr := auth.PeekToken(token); perr == nil && alg != "" && alg != "HS256" {
+					providers, _ := cfg.TenantConfig.TenantOIDCProviders(r.Context(), tenantID)
+					if provider, ok := findOIDCProvider(providers, issuer); ok {
+						idpClaims, err := cfg.OIDCVerifier.VerifyOIDC(r.Context(), provider.Issuer, provider.Audience, provider.JWKSURL, token)
+						if err != nil {
+							writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid token"})
+							return
+						}
+						ctx := ContextWithPrincipal(r.Context(), idpPrincipal(tenantID, provider, idpClaims))
+						next.ServeHTTP(w, r.WithContext(ctx))
+						return
+					}
+				}
 			}
 
 			claims, err := cfg.AuthVerifier.Verify(r.Context(), token)
@@ -246,7 +272,12 @@ func authMiddleware(cfg Config) func(http.Handler) http.Handler {
 				return
 			}
 
-			ctx := ContextWithTenant(r.Context(), tenantID)
+			ctx := ContextWithPrincipal(r.Context(), &Principal{
+				TenantID: tenantID,
+				Subject:  claims.Subject,
+				Mode:     AuthModeJWT,
+				Scopes:   trustedScopes(),
+			})
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

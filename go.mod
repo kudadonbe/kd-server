@@ -11,6 +11,8 @@ require (
 )
 
 require (
+	github.com/MicahParks/jwkset v0.11.0 // indirect
+	github.com/MicahParks/keyfunc/v3 v3.8.0 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.2 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
@@ -31,4 +33,5 @@ require (
 	golang.org/x/crypto v0.40.0 // indirect
 	golang.org/x/sync v0.16.0 // indirect
 	golang.org/x/text v0.27.0 // indirect
+	golang.org/x/time v0.9.0 // indirect
 )

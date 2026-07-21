@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+
+	"github.com/kudadonbe/kd-server/internal/store"
 )
 
 const (
@@ -13,15 +15,17 @@ const (
 	corsMaxAge       = "600"
 )
 
-// TenantConfigReader exposes the per-tenant integration settings the CORS layer
-// needs. Kept small on purpose (ISP): the middleware depends on this narrow
-// contract, not on the concrete store.
+// TenantConfigReader exposes the per-tenant integration settings the HTTP layer
+// reads: CORS origins (this middleware) and external-IdP providers (auth). It
+// depends on this narrow contract, not on the concrete store.
 type TenantConfigReader interface {
 	// TenantAllowedOrigins returns the CORS origins configured for one tenant.
 	TenantAllowedOrigins(ctx context.Context, tenant string) ([]string, error)
 	// OriginRegistered reports whether any tenant allows the origin. Used for
 	// preflight, which carries no tenant header.
 	OriginRegistered(ctx context.Context, origin string) (bool, error)
+	// TenantOIDCProviders returns the external-IdP providers for a tenant.
+	TenantOIDCProviders(ctx context.Context, tenant string) ([]store.OIDCProvider, error)
 }
 
 // corsMiddleware answers cross-origin requests for /v1 using per-tenant origin

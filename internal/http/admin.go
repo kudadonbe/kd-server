@@ -91,6 +91,21 @@ func adminAPIHandler(cfg Config, adminAuth *adminAuthenticator) http.Handler {
 				return
 			}
 			writeJSON(w, http.StatusOK, tenant)
+		case r.URL.Path == "/admin/api/tenants/oidc" && r.Method == http.MethodPost:
+			var req struct {
+				Slug      string               `json:"slug"`
+				Providers []store.OIDCProvider `json:"providers"`
+			}
+			if err := decodeAdminJSON(r, &req); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid payload"})
+				return
+			}
+			tenant, err := cfg.AdminService.SetTenantOIDCProviders(r.Context(), req.Slug, req.Providers)
+			if err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+				return
+			}
+			writeJSON(w, http.StatusOK, tenant)
 		case r.URL.Path == "/admin/api/keys" && r.Method == http.MethodPost:
 			var req struct {
 				Tenant string `json:"tenant"`

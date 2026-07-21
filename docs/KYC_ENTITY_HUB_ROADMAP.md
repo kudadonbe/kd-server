@@ -5,7 +5,7 @@ Tracks the work that turns kd-server into a shared KYC/entity hub for many apps
 land. **One PR = one part.** Keep this file updated when a part completes.
 
 - **Status legend:** `[ ]` todo · `[x]` done · `[~]` in progress
-- **Last updated:** 2026-07-21 · Phase 1 + Part A shipped; Part B (tenant-config + CORS) implemented & verified; Part C next
+- **Last updated:** 2026-07-21 · Phase 1 + Parts A/B shipped; Part C (scope model + tenant OIDC + JWKS/RS256 IdP auth) implemented & verified live; Part D next
 - **Build notes for the aqd consumer flow (extract → prefill KYC):** `AQD_KYC_INTEGRATION.md`
 
 ## Why
@@ -123,14 +123,52 @@ manual test (sample cards only, never a real document).
       Content-Type`; echo only allowlisted origins; `Vary: Origin`; no wildcard.
       Runs before `authMiddleware`. Verified live (allowed/disallowed × preflight/actual)
 
-**Part C — Browser-safe auth (mode 1: external IdP)**  (Phase 2)
-- [ ] Tenant config: OIDC issuer + audience + JWKS URL (aqd = Firebase
-      `securetoken.google.com/aqd-fc`, RS256)
-- [ ] `authMiddleware` second path: verify tenant-IdP token → restricted scope
-      set (start `extract` only); end-user `sub`/`email` → rate-limit key + audit actor
-- [ ] Scope-enforcement layer (routes check scopes only: `extract`,
-      `search:read`, `records:write`, `verify`), covering API-key + JWT + IdP modes
+**Part C — Browser-safe auth + scope model**  (Phase 2)  `[~]`
+- [x] **C1 — scope model:** `Principal{tenant, subject, mode, scopes}` in context;
+      `requireScope` wrapper; routes check scopes, never auth mode (OCP). API-key
+      and kd-server-JWT callers get trusted (all) scopes. Gated `/v1/search`,
+      `/v1/search/reindex`, `/v1/identity-documents/extract`. Verified live.
+- [x] **C2 — tenant OIDC config:** `Tenant.Config.OIDC`, store + admin
+      `POST /admin/api/tenants/oidc`. *(Refactor to a provider LIST before C3 —
+      a tenant has multiple IdPs: Firebase now, eFaas later.)*
+- [x] **C3 — external-IdP verification:** third `authMiddleware` path — RS256
+      tokens verified via JWKS (`MicahParks/keyfunc`), issuer/audience/expiry
+      enforced; token issuer selects the tenant provider; Principal built with
+      provider scopes (Firebase role claim → public `extract` / staff
+      `search:read` / admin all; eFaas `identity_verified` → carries national ID).
+      Verified live with a local JWKS harness: public→search 403, public→extract
+      400, staff→search 200, tampered→401. Firebase now; eFaas additive.
+- [ ] Owner test with a real Firebase ID token (happy path against Google JWKS)
+- [ ] Rate-limit + audit by end-user `sub` (cost + bulk-exfil control)
+
+**Auth provider = trust level** (this is the whole safety model)
+
+| Caller | Trust basis | Verified? | Scopes / reveal |
+|---|---|---|---|
+| App backend (API key, server-to-server) | tenant secret; a trusted server | app asserts it (delegated) | trusted; may reveal linked data |
+| **eFaas** browser token (later) | gov-verified national ID **in token** | yes | reveal their **own** record + linked |
+| Staff (Firebase office email) | signed `role` claim | trusted role | `search:read` (+`verify` admin) |
+| **Firebase Gmail** browser (public) | authenticated only | no | `extract` only — no reveal |
+
+- Guardrail: "verified" is trustworthy only from a **server-side API-key caller**
+  or a **verified IdP issuer** (eFaas) — never a plain browser token that merely
+  *claims* it. A static browser can't be trusted to self-assert or to conceal.
+- Reveal rule (Part D): **verified → full record incl. linked data; unverified →
+  extract only, no reveal.** "Verified" = eFaas, app-backend delegate, or staff.
+- aqd today has no backend of its own → its browser calls kd-server directly with
+  Firebase tokens (C3 path). Apps with their own servers call server-to-server
+  with an API key (existing path) as trusted delegates.
 - [ ] (Later) mode 2 token exchange for tenants that have their own backend
+
+**Part C-ext — self-service reveal**  `[ ]`
+- [ ] `/v1/me` verified-self lookup: returns only the caller's own record, keyed
+      to the token identity (eFaas national ID / staff-verified binding), never to
+      a user-supplied ID. aqd renders (prefill + disable on-file fields).
+- [ ] Public (unverified) users: prefill from **extraction only** — no DB reveal
+      (avoids the FC membership leak); DB is used server-side at submit for
+      resolve/dedup/conflict, returning nothing sensitive.
+- [ ] KBA is **not** a reveal gate (weak vs the FC known-adversary threat); any
+      user-supplied confirming data feeds the **staff verification** queue instead.
 
 **Part D — Finalize & verify**  (Phases 3–4)
 - [ ] Normalize + validate → structured per-field errors (national ID, sex enum,

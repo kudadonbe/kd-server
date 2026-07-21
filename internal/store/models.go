@@ -55,19 +55,29 @@ type Tenant struct {
 }
 
 // TenantConfig holds per-tenant integration settings shared across consuming
-// apps. Extended as the aqd enablement track lands: CORS origins now (Part B),
-// external-IdP config for browser-safe auth next (Part C).
+// apps. Extended as the aqd enablement track lands: CORS origins (Part B) and
+// external-IdP providers for browser-safe auth (Part C).
 type TenantConfig struct {
-	AllowedOrigins []string    `bson:"allowedOrigins,omitempty" json:"allowed_origins,omitempty"`
-	OIDC           *TenantOIDC `bson:"oidc,omitempty" json:"oidc,omitempty"`
+	AllowedOrigins []string       `bson:"allowedOrigins,omitempty" json:"allowed_origins,omitempty"`
+	OIDCProviders  []OIDCProvider `bson:"oidcProviders,omitempty" json:"oidc_providers,omitempty"`
 }
 
-// TenantOIDC configures external-IdP bearer verification for browser-only
-// tenants (reserved for aqd Part C — declared here, not yet enforced).
-type TenantOIDC struct {
-	Issuer   string `bson:"issuer" json:"issuer"`
-	Audience string `bson:"audience" json:"audience"`
-	JWKSURL  string `bson:"jwksUrl" json:"jwks_url"`
+// OIDCProvider configures verification of one external-IdP browser token. A
+// tenant may have several (e.g. Firebase for app login now, eFaas for
+// government-verified identity later). The token's issuer selects the provider.
+type OIDCProvider struct {
+	Name     string `bson:"name" json:"name"`         // "firebase" | "efaas" | ...
+	Issuer   string `bson:"issuer" json:"issuer"`     // must equal the token's iss
+	Audience string `bson:"audience" json:"audience"` // must equal the token's aud
+	JWKSURL  string `bson:"jwksUrl" json:"jwks_url"`  // RS256 public keys
+	// IdentityVerified marks a provider whose token carries a government-verified
+	// national ID (eFaas). Such a caller may see their own record + linked data.
+	IdentityVerified bool `bson:"identityVerified,omitempty" json:"identity_verified,omitempty"`
+	// NationalIDClaim names the claim holding the verified national ID (eFaas).
+	NationalIDClaim string `bson:"nationalIdClaim,omitempty" json:"national_id_claim,omitempty"`
+	// RoleClaim names the claim holding a staff/admin role (Firebase). Absent or
+	// unknown role → public (extract only).
+	RoleClaim string `bson:"roleClaim,omitempty" json:"role_claim,omitempty"`
 }
 
 // APIKey represents an API key record stored for a tenant.

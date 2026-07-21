@@ -655,6 +655,11 @@ func (s *stubAdminStore) SetTenantAllowedOrigins(_ context.Context, slug string,
 	return &store.Tenant{Slug: slug, Config: store.TenantConfig{AllowedOrigins: origins}, CreatedAt: time.Now()}, nil
 }
 
+func (s *stubAdminStore) SetTenantOIDCProviders(_ context.Context, slug string, providers []store.OIDCProvider) (*store.Tenant, error) {
+	s.lastSlug = slug
+	return &store.Tenant{Slug: slug, Config: store.TenantConfig{OIDCProviders: providers}, CreatedAt: time.Now()}, nil
+}
+
 func (s *stubAdminStore) IssueAPIKey(context.Context, string, string) (*store.IssuedAPIKey, error) {
 	return nil, errors.New("not implemented")
 }
