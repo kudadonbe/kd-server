@@ -1,12 +1,17 @@
 # KD-Server API Usage
 
 Integration reference for apps consuming kd-server (first consumer: **aqd**).
-Covers the live `/v1` surface. Contracts are snake_case JSON. This doc reflects
-the current server; planned endpoints are marked **(planned)**.
+Covers the live `/v1` surface. Contracts are snake_case JSON; every endpoint here
+is implemented.
 
 > Source of truth for schemas is meant to be `api/openapi.yaml`, but that file is
 > currently a stale placeholder — treat this doc as the working reference until
 > the spec is refreshed.
+
+**ID-card flow (aqd):** `extract` (read card → suggested fields) → user reviews →
+`finalize` (save, stored unverified) → `search` finds the person → `verify`
+(authorized) promotes it to the source of truth. Each step is scope-gated; see
+Authorization.
 
 ## Base URL
 
@@ -22,13 +27,16 @@ Every route except `GET /v1/healthz` requires **two** headers:
 | `Authorization` | `Bearer <credential>` |
 | `X-KD-Tenant` | tenant slug, e.g. `fc` |
 
-`<credential>` is either:
-- a **tenant API key** — `key_<id>.<secret>`, issued from the admin console
-  (server-side secret; never ship it in a browser bundle), or
-- an **HS256 JWT** whose `tenant` claim equals the `X-KD-Tenant` header.
+`<credential>` is one of three kinds — the server auto-detects which:
 
-Browser-safe per-user auth (verify the app user's own IdP token, scoped) is
-**(planned — aqd Part C)**; until then, calls are server-to-server.
+- **Tenant API key** — `key_<id>.<secret>`, issued from the admin console. A
+  trusted server-side secret; **never ship it in a browser bundle**. Use it from
+  an app's own backend.
+- **kd-server JWT** (HS256) whose `tenant` claim equals `X-KD-Tenant`.
+- **External-IdP token** (RS256) — an app end-user's own token (e.g. a Firebase
+  ID token), verified against the tenant's configured provider
+  (issuer + audience + JWKS). This is how a **static browser app** authenticates
+  its users without shipping any secret. Configure providers per tenant (below).
 
 **Auth failures**
 
@@ -36,8 +44,57 @@ Browser-safe per-user auth (verify the app user's own IdP token, scoped) is
 |---|---|
 | Missing `X-KD-Tenant` | `400 {"error":"missing tenant header"}` |
 | Missing/blank `Authorization` | `401 {"error":"missing authorization"}` |
-| Bad API key | `401 {"error":"invalid API key"}` |
+| Bad API key / unverifiable token | `401 {"error":"invalid API key" / "invalid token"}` |
 | JWT tenant ≠ header | `403 {"error":"tenant mismatch"}` |
+| Caller lacks the route's scope | `403 {"error":"insufficient scope"}` |
+
+## Authorization (scopes)
+
+Routes check **scopes**, never the auth method — so how you authenticated and
+what you may do are decoupled.
+
+| Scope | Grants |
+|---|---|
+| `extract` | read an ID card (suggestion-only) |
+| `search:read` | query the entity index |
+| `records:write` | ingest/resolve, finalize identity documents |
+| `verify` | promote a record to verified |
+
+Who gets which scopes:
+
+| Caller | Scopes |
+|---|---|
+| API key / kd-server JWT (server-side, trusted) | all |
+| External-IdP user, **no role claim** (public) | `extract` only |
+| External-IdP user, `kd_role: staff` | `extract`, `search:read` |
+| External-IdP user, `kd_role: admin` | all |
+
+The server owns this mapping; a browser token can't grant itself scopes it wasn't
+issued. A public end-user therefore can **extract their own card** but cannot
+search or write — the privacy default.
+
+## CORS (browser apps)
+
+A static browser app calling `/v1` cross-origin needs its origin allowlisted per
+tenant. Preflight (`OPTIONS`) is answered automatically for allowlisted origins;
+the actual response echoes `Access-Control-Allow-Origin` only for that tenant's
+list. No wildcard, no credentials flag (auth is in headers, not cookies).
+
+**Onboarding a browser tenant** (admin, once — admin-session auth):
+```
+POST /admin/api/tenants/origins
+{ "slug":"aqd", "allowed_origins":["https://aqd-fc.web.app","http://localhost:3000"] }
+
+POST /admin/api/tenants/oidc
+{ "slug":"aqd", "providers":[
+    { "name":"firebase",
+      "issuer":"https://securetoken.google.com/aqd-fc",
+      "audience":"aqd-fc",
+      "jwks_url":"https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com",
+      "role_claim":"kd_role" } ] }
+```
+An identity-verifying provider (e.g. eFaas) additionally sets
+`"identity_verified":true` and `"national_id_claim":"…"`.
 
 ## Conventions
 
@@ -56,10 +113,11 @@ GET /v1/version            → 200 {"version":"1.0.0"}  (auth required)
 
 ---
 
-## Entity search  (shared, multi-signal)
+## Entity search  (shared, multi-signal)  · scope `search:read`
 
 Find a person from any partial signal. Read-only (POST because the body is
-structured and routinely carries Dhivehi/Thaana).
+structured and routinely carries Dhivehi/Thaana). Public browser users don't
+have this scope by design — see Authorization.
 
 ```
 POST /v1/search
@@ -112,7 +170,7 @@ Name/Dhivehi search only returns for a person that has an identity document
 
 ---
 
-## Identity-document extraction  (suggestion-only)
+## Identity-document extraction  (suggestion-only)  · scope `extract`
 
 Read a Maldivian ID card/PDF and return suggested fields. **Nothing is stored**;
 `Cache-Control: no-store`. AI vision first, Tesseract OCR fallback. The tenant is
@@ -147,7 +205,7 @@ Content-Type: multipart/form-data      // field "document", ≤10MB, PDF/JPEG/PN
 
 ---
 
-## Identity-document finalize & verify
+## Identity-document finalize & verify  · scopes `records:write`, `verify`
 
 The write path that makes kd-server the source of truth. Extraction is
 suggestion-only; saving is a separate, reviewed step.
