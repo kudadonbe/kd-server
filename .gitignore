@@ -33,6 +33,10 @@ search.rest
 extract.rest
 /tmp/*
 
+# Local datasets — real PII, NEVER commit (ingest locally, don't track)
+/data/
+*.pii.csv
+
 # Logs
 *.log
 .gocache/
