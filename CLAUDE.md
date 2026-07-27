@@ -25,6 +25,12 @@ time. Full details in `docs/CROSS_STATION_WORKFLOW.md`.
    checkout, set `core.autocrlf=false` and `core.eol=lf` once.
 5. **Commit only after the change is tested** (see below); `sync-end.sh` pushes
    only what is already committed.
+6. **Tag significant milestones as versions.** When a meaningful chunk of work
+   is done (or before a large/risky change), cut an annotated semver tag with
+   `bash scripts/tag-release.sh vX.Y.Z "milestone description"` so there's a
+   permanent point to roll back to or branch from. MAJOR = breaking `/v1`
+   change, MINOR = new backward-compatible features, PATCH = fixes. Keep
+   `appVersion` in `cmd/api/main.go` in step with the latest tag.
 
 ## Project Overview
 

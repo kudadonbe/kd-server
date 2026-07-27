@@ -54,6 +54,32 @@ sit down ─► sync-start.sh ─► work ─► test ─► commit ─► sync-
 - `sync-end.sh` never commits for you; it warns about uncommitted work and
   pushes what's already committed.
 
+## Version tags at significant milestones
+
+When a meaningful chunk of work is done (a shippable milestone, or right before
+a large/risky change), **cut a version tag** so you have a named point to roll
+back to or branch from.
+
+```bash
+bash scripts/tag-release.sh v1.2.0 "short description of the milestone"
+```
+
+- Tags are **annotated** and **semver-shaped** `vMAJOR.MINOR.PATCH`:
+  - **MAJOR** — breaking change to the existing `/v1` API.
+  - **MINOR** — new backward-compatible features/endpoints.
+  - **PATCH** — bug fixes only.
+- The script pushes the tag to `origin`, so every station sees it.
+- Keep `appVersion` in `cmd/api/main.go` in step with the latest tag.
+
+**Going back to / branching from a tag:**
+```bash
+git fetch --tags                          # get tags on any station
+git tag -l                                # list them
+git switch -c fix-from-v1.1.0 v1.1.0      # new branch starting at that tag
+git checkout v1.1.0                       # just inspect (detached HEAD)
+```
+A tag never moves, so it's a permanent, safe anchor — unlike a branch.
+
 ## If the branch has diverged anyway
 
 `sync-start.sh` will stop and tell you (`Diverged: N local / M remote`). Then:

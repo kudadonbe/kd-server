@@ -21,7 +21,7 @@ import (
 
 const (
 	defaultAddr          = ":8080"
-	appVersion           = "1.0.0"
+	appVersion           = "1.1.0"
 	shutdownTimeout      = 5 * time.Second
 	defaultMongoURI      = "mongodb://localhost:27017"
 	defaultMongoDatabase = "kdserver"
