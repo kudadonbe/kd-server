@@ -2,6 +2,30 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Cross-Station Workflow — READ FIRST (every agent, every station)
+
+This repo is developed from **two machines** (a Windows station and a MacBook).
+To stay in sync, every agent must follow these rules **without being told** each
+time. Full details in `docs/CROSS_STATION_WORKFLOW.md`.
+
+1. **At the start of a session, pull latest before doing anything.** Run
+   `bash scripts/sync-start.sh` (fetches + fast-forwards the branch, refreshes
+   local `main`). If that script is unavailable, do `git fetch --all --prune`
+   and fast-forward the current branch manually. Never start work on stale code.
+2. **At the end of a session, make sure the remote has everything.** Run
+   `bash scripts/sync-end.sh` to push all committed work so the other station
+   starts current. It never commits for you.
+3. **One branch per feature, used from both stations.** Do not commit feature
+   work to `main` from one station while the other is on a feature branch — that
+   is what caused past divergence. Check `git status` / current branch first.
+4. **Line endings are LF everywhere**, enforced by `.gitattributes`
+   (`* text=auto eol=lf`). If Go files show up as "modified" right after a
+   checkout, it is CRLF noise — confirm with `git diff --ignore-all-space`
+   (empty = noise) and renormalize; do **not** commit it. On a fresh Windows
+   checkout, set `core.autocrlf=false` and `core.eol=lf` once.
+5. **Commit only after the change is tested** (see below); `sync-end.sh` pushes
+   only what is already committed.
+
 ## Project Overview
 
 KD-Server is a multi-tenant Go + MongoDB backend that maintains a single source of truth for entities (people, organizations, assets) across tenant-specific integrations. It prevents data duplication by linking records from multiple sources (SchoolSync, Ekkurey, etc.) to resolved person entities.
