@@ -100,6 +100,8 @@ Copy `.env.example` to `.env`:
 - `MONGO_DB` - Database name (default: `kdserver`)
 - `JWT_SIGNING_KEY` - HS256 secret for token validation (set unique per environment)
 
+Known security/CI gaps (secret rotation, dependency scanning, CI coverage of integration tests, etc.) are tracked in `docs/SECURITY_CI_BACKLOG.md` — check it before assuming the current setup is production-hardened.
+
 ## Testing Patterns
 
 - Use table-driven tests with Go's `testing` package
@@ -150,6 +152,12 @@ if !ok {
 **Error handling in handlers**:
 - Return structured JSON errors via `writeJSON(w, statusCode, map[string]string{"error": "message"})`
 - Match OpenAPI error response schemas
+
+## Admin TUI
+
+`cmd/tui` is a super-admin, single-operator console that talks to MongoDB directly via `internal/services`, intentionally bypassing the HTTP auth/tenant middleware. Full details in `docs/ADMIN_TUI.md`.
+
+**Parity rule**: whenever a new domain service is added under `internal/services` that a super-admin would plausibly need to inspect or operate directly, extend `cmd/tui` in the same PR — don't let it lag behind the HTTP API/admin console.
 
 ## Branch Naming
 
