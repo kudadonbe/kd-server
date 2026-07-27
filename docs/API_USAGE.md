@@ -172,9 +172,19 @@ Name/Dhivehi search only returns for a person that has an identity document
 
 ## Identity-document extraction  (suggestion-only)  · scope `extract`
 
-Read a Maldivian ID card/PDF and return suggested fields. **Nothing is stored**;
-`Cache-Control: no-store`. AI vision first, Tesseract OCR fallback. The tenant is
-resolved from auth, so per-tenant AI credentials apply (else the server default).
+Read a Maldivian ID card/PDF and return suggested fields. The extracted document
+itself is **not stored** and is never echoed back beyond this response
+(`Cache-Control: no-store`). AI vision first, Tesseract OCR fallback. The tenant
+is resolved from auth, so per-tenant AI credentials apply (else the server
+default).
+
+**Capture side-effect (untrusted callers only):** if an `extract`-only caller
+(a public browser user, no `records:write`) traces a card that carries a
+national ID **and** information the server does not already hold, that *delta*
+is quarantined into the review queue as an `untrusted` lead — so new info is not
+lost. This is **side-effect-only**: the response below is unchanged and never
+reveals whether a person already existed or what was captured. Trusted callers
+do **not** capture here; they use finalize. See *finalize & verify*.
 
 ```
 POST /v1/identity-documents/extract
@@ -210,6 +220,9 @@ Content-Type: multipart/form-data      // field "document", ≤10MB, PDF/JPEG/PN
 The write path that makes kd-server the source of truth. Extraction is
 suggestion-only; saving is a separate, reviewed step.
 
+Finalize is **diff-aware**: it protects verified data and skips no-op writes.
+The response reports which of three things happened via `status`:
+
 ```
 POST /v1/identity-documents         (scope: records:write)
 {
@@ -222,17 +235,32 @@ POST /v1/identity-documents         (scope: records:write)
   "expiry_date":"…","serial_number":"…",
   "phone": "+960…"        // optional, only used to resolve-or-create the person
 }
-→ 200  the saved document (person resolved-or-created; version 1;
-        verification_status forced to "unverified")
-→ 400  {"error":"validation failed","fields":[{"field":"sex","message":"must be M or F"}]}
+
+→ 200 {"status":"saved","document":{…}}         // new person or additive/unverified update; version 1; unverified
+→ 200 {"status":"unchanged","document":{…}}     // trace held nothing new — nothing written (idempotent)
+→ 202 {"status":"queued_for_review",            // change would alter a VERIFIED record:
+       "review_id":"…","changed_fields":["island_english"]}   // queued, verified doc untouched
+→ 400 {"error":"validation failed","fields":[{"field":"sex","message":"must be M or F"}]}
 ```
 The server owns `verification_status` — a client **cannot** self-assert verified.
+A change that contradicts a verified record is **never applied directly**; it
+goes to the review queue for an authorized person to accept or reject.
 
 ```
 POST /v1/identity-documents/{id}/verify   (scope: verify — authorized role only)
 → 200  the document, verification_status "verified", verified_by set, version bumped
 ```
 This is what search-first treats as authoritative.
+
+**Review queue closes the loop.** Captured/queued items surface at
+`GET /v1/review?status=needs_review`. Accepting an identity capture **applies
+it**: resolve-or-create the person, save the document, and verify it — recording
+the reviewer as `verified_by`:
+```
+POST /v1/review/{id}/decision   { "decision": "accept" | "reject" }
+// accept → the captured document becomes a verified record; raw → resolved
+// reject → raw → rejected; nothing is applied
+```
 
 **Scopes:** browser (IdP) callers get `extract` by default; `records:write` and
 `verify` require a staff/admin role claim or a trusted server-side (API-key) caller.

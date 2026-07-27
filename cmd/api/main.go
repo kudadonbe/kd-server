@@ -93,7 +93,10 @@ func main() {
 	assetService := services.NewAssetService(mongoStore)
 	adminService := services.NewAdminService(mongoStore)
 	identityDocumentService := services.NewIdentityDocumentService(mongoStore)
+	identityCaptureService := services.NewIdentityCaptureService(mongoStore)
 	identityFinalizeService := services.NewIdentityFinalizeService(mongoStore)
+	identityFinalizeService.SetCapture(identityCaptureService)
+	reviewService.SetFinalize(identityFinalizeService)
 	documentExtractor, err := services.NewLocalDocumentExtractor()
 	if err != nil {
 		logger.Printf("warning: document extraction disabled: %v", err)
@@ -138,6 +141,7 @@ func main() {
 		AdminService:          adminService,
 		IdentityDocuments:     identityDocumentService,
 		IdentityFinalize:      identityFinalizeService,
+		IdentityCapture:       identityCaptureService,
 		DocumentExtractor:     docExtractor,
 		AIService:             aiService,
 		TenantConfig:          mongoStore,

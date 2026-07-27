@@ -32,6 +32,7 @@ type Config struct {
 	AdminService          *services.AdminService
 	IdentityDocuments     services.IdentityDocuments
 	IdentityFinalize      IdentityFinalizer
+	IdentityCapture       *services.IdentityCaptureService
 	DocumentExtractor     services.DocumentExtractor
 	AIService             *ai.Service
 	TenantConfig          TenantConfigReader

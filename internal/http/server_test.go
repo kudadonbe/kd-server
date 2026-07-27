@@ -781,7 +781,7 @@ func (s *stubReview) List(ctx context.Context, tenantID, status string, limit in
 	return s.items, nil
 }
 
-func (s *stubReview) Decide(ctx context.Context, tenantID, rawID, decision string) error {
+func (s *stubReview) Decide(ctx context.Context, tenantID, rawID, decision, actor string) error {
 	s.lastTenant = tenantID
 	s.lastID = rawID
 	s.lastDecision = decision

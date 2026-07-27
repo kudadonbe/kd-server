@@ -59,7 +59,7 @@ func reviewDecisionHandler(cfg Config) http.Handler {
 			return
 		}
 
-		if err := cfg.ReviewService.Decide(r.Context(), tenantID, rawID, req.Decision); err != nil {
+		if err := cfg.ReviewService.Decide(r.Context(), tenantID, rawID, req.Decision, actorFromContext(r.Context())); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 			return
 		}

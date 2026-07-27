@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
+	"strings"
 
 	"github.com/kudadonbe/kd-server/internal/services"
 	"github.com/kudadonbe/kd-server/internal/store"
@@ -16,7 +17,7 @@ import (
 // IdentityFinalizer saves reviewed extraction as a versioned identity document
 // and promotes a document to verified.
 type IdentityFinalizer interface {
-	Finalize(ctx context.Context, tenantID, actor, phone string, doc store.IdentityDocument) (*store.IdentityDocument, error)
+	Finalize(ctx context.Context, tenantID, actor, phone string, doc store.IdentityDocument) (*services.FinalizeResult, error)
 	Verify(ctx context.Context, tenantID, documentID, actor string) (*store.IdentityDocument, error)
 }
 
@@ -82,6 +83,12 @@ func identityDocumentExtractHandler(cfg Config) http.Handler {
 			return
 		}
 
+		// Untrusted (extract-only) callers cannot finalize, so any genuinely new
+		// info a trace surfaces would be lost. Quarantine it to the review queue
+		// as an untrusted lead. Best-effort and side-effect-only: the response is
+		// unchanged and never reveals what (if anything) was captured.
+		captureExtractionForReview(r.Context(), cfg, tenantID, extraction)
+
 		w.Header().Set("Cache-Control", "no-store")
 		writeJSON(w, http.StatusOK, extraction)
 	})
@@ -117,7 +124,7 @@ func identityDocumentFinalizeHandler(cfg Config) http.Handler {
 			return
 		}
 
-		saved, err := cfg.IdentityFinalize.Finalize(r.Context(), tenantID, actorFromContext(r.Context()), req.Phone, req.IdentityDocument)
+		result, err := cfg.IdentityFinalize.Finalize(r.Context(), tenantID, actorFromContext(r.Context()), req.Phone, req.IdentityDocument)
 		if err != nil {
 			var verr *services.ValidationError
 			if errors.As(err, &verr) {
@@ -127,7 +134,12 @@ func identityDocumentFinalizeHandler(cfg Config) http.Handler {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "finalize failed"})
 			return
 		}
-		writeJSON(w, http.StatusOK, saved)
+		// A change that would alter a verified record is queued, not applied.
+		status := http.StatusOK
+		if result.Status == services.FinalizeStatusQueuedForReview {
+			status = http.StatusAccepted
+		}
+		writeJSON(w, status, result)
 	})
 }
 
@@ -153,6 +165,39 @@ func identityDocumentVerifyHandler(cfg Config) http.Handler {
 		}
 		writeJSON(w, http.StatusOK, saved)
 	})
+}
+
+// captureExtractionForReview quarantines newly-traced info from an untrusted
+// (extract-only) caller into the review queue. It is a no-op for trusted
+// callers (they finalize instead), when no capture service is wired, or when the
+// trace carries no national ID to resolve against. Errors are swallowed — this
+// must never affect the extraction response.
+func captureExtractionForReview(ctx context.Context, cfg Config, tenantID string, ext *services.DocumentExtraction) {
+	if cfg.IdentityCapture == nil || ext == nil || strings.TrimSpace(ext.NationalID) == "" {
+		return
+	}
+	if p, ok := PrincipalFromContext(ctx); ok && p.HasScope(ScopeRecordsWrite) {
+		return // trusted callers capture via finalize, not extract
+	}
+	doc := documentFromExtraction(ext)
+	_, _, _ = cfg.IdentityCapture.Capture(ctx, tenantID, "public:"+tenantID, services.CaptureTrustUntrusted, "", doc)
+}
+
+// documentFromExtraction maps a suggestion-only extraction into the identity
+// document shape used for diffing and storage.
+func documentFromExtraction(ext *services.DocumentExtraction) store.IdentityDocument {
+	return store.IdentityDocument{
+		NationalID:       ext.NationalID,
+		Name:             store.LocalizedText{English: ext.NameEnglish, Dhivehi: ext.NameDhivehi},
+		CommonName:       store.LocalizedText{English: ext.CommonName},
+		Sex:              ext.Sex,
+		DateOfBirth:      ext.DateOfBirth,
+		Address:          store.IdentityAddress{House: store.LocalizedText{English: ext.HouseEnglish, Dhivehi: ext.HouseDhivehi}, Island: store.LocalizedText{English: ext.IslandEnglish, Dhivehi: ext.IslandDhivehi}},
+		BloodGroup:       ext.BloodGroup,
+		ExpiryDate:       ext.ExpiryDate,
+		SerialNumber:     ext.SerialNumber,
+		ExtractionMethod: ext.Engine,
+	}
 }
 
 // actorFromContext returns the audit actor for the request (the principal's

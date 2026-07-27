@@ -82,7 +82,7 @@ func decideReview(ctx context.Context, reviewService *services.ReviewService, re
 	rawID := prompt(reader, "Raw record ID")
 	decision := promptDefault(reader, "Decision (accept/reject)", "accept")
 
-	if err := reviewService.Decide(ctx, tenantID, rawID, decision); err != nil {
+	if err := reviewService.Decide(ctx, tenantID, rawID, decision, "tui-admin"); err != nil {
 		return err
 	}
 

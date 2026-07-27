@@ -38,12 +38,33 @@ type IdentityFinalizeStore interface {
 	VerifyIdentityDocument(ctx context.Context, tenantID, documentID, verifiedBy string) (*store.IdentityDocument, error)
 }
 
+// Finalize outcomes.
+const (
+	FinalizeStatusSaved            = "saved"             // stored (new person or additive/unverified update)
+	FinalizeStatusUnchanged        = "unchanged"         // trace held nothing new; nothing written
+	FinalizeStatusQueuedForReview  = "queued_for_review" // would change a verified record; queued instead
+	finalizeSourceReview           = "app-finalize"
+	finalizeExtractionMethodReview = "app-review"
+)
+
+// FinalizeResult reports what finalize did with a submitted document. Exactly
+// one of Document (saved/unchanged) or ReviewID (queued) is populated.
+type FinalizeResult struct {
+	Status        string                  `json:"status"`
+	Document      *store.IdentityDocument `json:"document,omitempty"`
+	ReviewID      string                  `json:"review_id,omitempty"`
+	ChangedFields []string                `json:"changed_fields,omitempty"`
+}
+
 // IdentityFinalizeService turns reviewed extraction into a stored identity
 // document: it resolves-or-creates the person and saves the document tagged
 // unverified. The server owns verification_status — a client cannot self-assert
-// verified; that is a separate, authorized Verify step.
+// verified; that is a separate, authorized Verify step. When a capture service
+// is attached, finalize becomes diff-aware: it protects verified data by routing
+// conflicting changes to the review queue instead of overwriting them.
 type IdentityFinalizeService struct {
-	store IdentityFinalizeStore
+	store   IdentityFinalizeStore
+	capture *IdentityCaptureService
 }
 
 // NewIdentityFinalizeService builds the finalize/verify service.
@@ -51,9 +72,17 @@ func NewIdentityFinalizeService(s IdentityFinalizeStore) *IdentityFinalizeServic
 	return &IdentityFinalizeService{store: s}
 }
 
-// Finalize normalizes and validates the document, resolves-or-creates the
-// person by national ID (+ optional phone), then saves it as unverified.
-func (s *IdentityFinalizeService) Finalize(ctx context.Context, tenantID, actor, phone string, doc store.IdentityDocument) (*store.IdentityDocument, error) {
+// SetCapture attaches the diff/capture collaborator that makes finalize
+// diff-aware. Optional: without it, finalize saves unverified as before.
+func (s *IdentityFinalizeService) SetCapture(c *IdentityCaptureService) {
+	s.capture = c
+}
+
+// Finalize normalizes and validates the document, then decides what to do:
+//   - trace holds nothing new  → unchanged (no write)
+//   - change would alter a verified record → queued for review (verified data untouched)
+//   - otherwise → resolve-or-create the person and save the document unverified.
+func (s *IdentityFinalizeService) Finalize(ctx context.Context, tenantID, actor, phone string, doc store.IdentityDocument) (*FinalizeResult, error) {
 	if s == nil || s.store == nil {
 		return nil, errors.New("services: identity finalize store not configured")
 	}
@@ -70,7 +99,38 @@ func (s *IdentityFinalizeService) Finalize(ctx context.Context, tenantID, actor,
 		return nil, verr
 	}
 
-	// Resolve-or-create the person by deterministic identifiers.
+	// Diff-aware path: protect verified data and skip no-op writes.
+	if s.capture != nil {
+		delta, err := s.capture.Diff(ctx, tenantID, phone, doc)
+		if err != nil {
+			return nil, err
+		}
+		switch {
+		case delta.ConflictsVerified:
+			rawID, _, cerr := s.capture.Capture(ctx, tenantID, "app:"+tenantID, CaptureTrustTrusted, phone, doc)
+			if cerr != nil {
+				return nil, cerr
+			}
+			return &FinalizeResult{
+				Status:        FinalizeStatusQueuedForReview,
+				ReviewID:      rawID,
+				ChangedFields: changedFieldLabels(delta.Changed),
+			}, nil
+		case !delta.HasNewInfo():
+			return &FinalizeResult{Status: FinalizeStatusUnchanged, Document: delta.Current}, nil
+		}
+	}
+
+	saved, err := s.saveUnverified(ctx, tenantID, actor, phone, doc)
+	if err != nil {
+		return nil, err
+	}
+	return &FinalizeResult{Status: FinalizeStatusSaved, Document: saved}, nil
+}
+
+// saveUnverified resolves-or-creates the person and stores the document tagged
+// unverified. It is the shared write path for finalize and review-accept.
+func (s *IdentityFinalizeService) saveUnverified(ctx context.Context, tenantID, actor, phone string, doc store.IdentityDocument) (*store.IdentityDocument, error) {
 	ids := store.PersonIdentifiers{NationalID: doc.NationalID, Phone: phone}
 	person, err := s.store.FindPersonByIdentifiers(ctx, tenantID, ids)
 	switch {
@@ -96,10 +156,10 @@ func (s *IdentityFinalizeService) Finalize(ctx context.Context, tenantID, actor,
 	doc.VerificationStatus = VerificationStatusUnverified
 	doc.VerifiedBy = ""
 	if doc.Source == "" {
-		doc.Source = "app-finalize"
+		doc.Source = finalizeSourceReview
 	}
 	if doc.ExtractionMethod == "" {
-		doc.ExtractionMethod = "app-review"
+		doc.ExtractionMethod = finalizeExtractionMethodReview
 	}
 
 	return s.store.SaveIdentityDocument(ctx, doc, actor)
